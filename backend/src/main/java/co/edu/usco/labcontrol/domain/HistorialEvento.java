@@ -1,0 +1,49 @@
+package co.edu.usco.labcontrol.domain;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import org.hibernate.annotations.Immutable;
+
+/**
+ * Historial inmutable (RF-03 / PF-14). Solo se inserta: @Immutable impide UPDATE desde JPA y el
+ * repositorio no expone borrado. En MySQL se recomienda además revocar UPDATE/DELETE sobre la tabla.
+ */
+@Entity
+@Immutable
+@Table(name = "historial_eventos", indexes = @Index(name = "idx_hist_fecha", columnList = "fecha"))
+public class HistorialEvento {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false) private LocalDateTime fecha;
+    /** RESERVA, CANCELACION, RECHAZO, SALIDA, ENTRADA, INCIDENCIA, CUSTODIA, ALTA, ESTADO, BAJA */
+    @Column(nullable = false, length = 20) private String tipo;
+    @Column(length = 20) private String placa;
+    @Column(length = 120) private String equipoNombre;
+    @Column(length = 40) private String laboratorio;
+    @Column(length = 20) private String prestamoCodigo;
+    @Column(length = 120) private String usuarioNombre;
+    @Column(length = 120) private String auxiliarNombre;
+    @Column(length = 600) private String detalle;
+
+    protected HistorialEvento() {}
+
+    public HistorialEvento(LocalDateTime fecha, String tipo, Equipo e, String prestamoCodigo,
+                           String usuarioNombre, String auxiliarNombre, String detalle) {
+        this.fecha = fecha; this.tipo = tipo;
+        if (e != null) { this.placa = e.getPlaca(); this.equipoNombre = e.getNombre(); this.laboratorio = e.getLaboratorio(); }
+        this.prestamoCodigo = prestamoCodigo; this.usuarioNombre = usuarioNombre;
+        this.auxiliarNombre = auxiliarNombre; this.detalle = detalle;
+    }
+
+    public Long getId() { return id; }
+    public LocalDateTime getFecha() { return fecha; }
+    public String getTipo() { return tipo; }
+    public String getPlaca() { return placa; }
+    public String getEquipoNombre() { return equipoNombre; }
+    public String getLaboratorio() { return laboratorio; }
+    public String getPrestamoCodigo() { return prestamoCodigo; }
+    public String getUsuarioNombre() { return usuarioNombre; }
+    public String getAuxiliarNombre() { return auxiliarNombre; }
+    public String getDetalle() { return detalle; }
+}

@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============ Paleta por tema (valores RGB para admitir opacidad en Tailwind) ============ */
+:root {
+  --c-fondo: 244 244 244;
+  --c-superficie: 255 255 255;
+  --c-pizarra: 77 98 108;
+  --c-pizarra-oscuro: 51 65 85;
+  --c-usco-soft: 251 239 239;
+  --c-alerta-fondo: 254 242 242;
+  --c-alerta-borde: 220 38 38;
+  --c-alerta-texto: 153 27 27;
+  color-scheme: light;
+}
+.dark {
+  --c-fondo: 13 18 25;
+  --c-superficie: 23 32 43;
+  --c-pizarra: 160 177 190;
+  --c-pizarra-oscuro: 211 220 230;
+  --c-usco-soft: 58 24 28;
+  --c-alerta-fondo: 58 21 24;
+  --c-alerta-borde: 248 113 113;
+  --c-alerta-texto: 252 165 165;
+  color-scheme: dark;
+}
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-fondo text-slate-800 font-sans antialiased transition-colors duration-200; }
+  h1, h2, h3, h4 { @apply font-titulo text-slate-900; }
+  /* PA-06: foco visible y consistente en toda la app */
+  :focus-visible { @apply outline outline-2 outline-offset-2 outline-salida; }
+  .dark :focus-visible { outline-color: #93B4FF; }
+  ::selection { background: #DFD4A6; color: #5C0D12; }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 min-h-[44px] text-sm font-semibold
+           transition-colors disabled:opacity-60 disabled:cursor-not-allowed select-none;
+  }
+  /* Jerarquía de botones (PU-03, PU-09): primario sólido / secundario outline */
+  .btn-primary { @apply btn bg-usco text-white hover:bg-usco-dark active:bg-usco-darker shadow-sm; }
+  .btn-outline { @apply btn border border-slate-300 bg-superficie text-pizarra-oscuro hover:bg-slate-50 hover:border-slate-400; }
+  .btn-danger  { @apply btn bg-red-600 text-white hover:bg-red-700; }
+  /* PA-07: azul = SALIDA (préstamo), verde = ENTRADA (devolución) */
+  .btn-salida  { @apply btn bg-salida text-white hover:bg-salida-dark shadow-sm; }
+  /* Verde oscuro: texto blanco con contraste ≥ 4,5:1 (WCAG AA) */
+  .btn-entrada { @apply btn bg-entrada-dark text-white hover:bg-emerald-800 shadow-sm; }
+  .btn-sm { @apply min-h-[36px] px-3 py-1.5 text-xs; }
+
+  .card { @apply bg-superficie rounded-xl border border-slate-200 shadow-tarjeta; }
+  .input {
+    @apply w-full rounded-lg border border-slate-300 bg-superficie px-3 py-2.5 min-h-[44px] text-sm text-slate-900
+           placeholder:text-slate-500 focus:border-usco focus:ring-2 focus:ring-usco/20 focus:outline-none;
+  }
+  .input-error { @apply border-alerta-borde bg-alerta-fondo focus:border-alerta-borde focus:ring-alerta-borde/20; }
+  .label { @apply block text-sm font-semibold text-pizarra-oscuro mb-1; }
+  .th { @apply px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-pizarra-oscuro bg-slate-100 border-b border-slate-200; }
+  .td { @apply px-4 py-3 text-sm text-slate-700 border-b border-slate-100 align-middle; }
+  .placa { @apply font-mono text-[13px] font-semibold tracking-tight text-slate-700; }
+}
+
+/* ============ Modo oscuro: reasigna las utilidades de color que usan los componentes ============ */
+.dark body { color: #E2E8F0; }
+.dark .bg-white { background-color: rgb(var(--c-superficie)); }
+.dark .bg-white\/95 { background-color: rgb(23 32 43 / .95); }
+.dark .bg-slate-50, .dark .hover\:bg-slate-50:hover, .dark .focus\:bg-white:focus { background-color: #1B2531; }
+.dark .bg-slate-100, .dark .hover\:bg-slate-100:hover { background-color: #212D3B; }
+.dark .bg-slate-200 { background-color: #2B3848; }
+.dark .text-slate-900 { color: #F1F5F9; }
+.dark .text-slate-800 { color: #E5EAF1; }
+.dark .text-slate-700 { color: #CBD5E1; }
+.dark .text-slate-600 { color: #B4C0CE; }
+.dark .text-slate-500 { color: #98A6B8; }
+.dark .text-slate-400, .dark .placeholder\:text-slate-400::placeholder { color: #7F8EA3; }
+.dark .border-slate-100 { border-color: #243040; }
+.dark .border-slate-200, .dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]), .dark .ring-slate-200, .dark .disabled\:hover\:border-slate-200:disabled:hover { border-color: #2D3A4A; --tw-ring-color: #2D3A4A; }
+.dark .border-slate-300, .dark .ring-slate-300 { border-color: #3B4A5E; --tw-ring-color: #3B4A5E; }
+.dark .border-slate-400, .dark .hover\:border-slate-400:hover, .dark .hover\:border-slate-300:hover { border-color: #51647A; }
+/* estados */
+.dark .bg-emerald-50 { background-color: #0C2E25; }
+.dark .text-emerald-800 { color: #6EE7B7; }
+.dark .text-emerald-900 { color: #A7F3D0; }
+.dark .bg-amber-50 { background-color: #2F2308; }
+.dark .text-amber-900 { color: #FCD34D; }
+.dark .text-amber-700 { color: #FBBF24; }
+.dark .bg-blue-50 { background-color: #10264A; }
+.dark .text-blue-900 { color: #BFDBFE; }
+.dark .hover\:bg-red-50:hover { background-color: #3A1518; }
+.dark .bg-violet-50 { background-color: #251B47; }
+.dark .text-violet-900 { color: #DDD6FE; }
+.dark .text-usco-darker { color: #F5B5B9; }
+.dark .bg-oro-claro.text-usco-darker { color: #5C0D12; }
+.dark .bg-slate-800 { background-color: #2B3848; }
+.dark .text-entrada { color: #34D399; }
+.dark .text-salida { color: #93B4FF; }
+.dark .text-usco, .dark .hover\:text-usco:hover { color: #F28B91; }
+.dark .border-usco, .dark .hover\:border-usco:hover { border-color: #D8565E; }
+.dark .hover\:bg-usco-soft:hover { background-color: rgb(var(--c-usco-soft)); }
+/* los textos blancos sobre fondos de color institucional se conservan */
+.dark h1, .dark h2, .dark h3, .dark h4 { color: #F1F5F9; }
+.dark .btn-outline { border-color: #3B4A5E; }
+.dark .btn-outline:hover { background-color: #1B2531; border-color: #51647A; }
+.dark .card { border-color: #2D3A4A; box-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 4px 14px rgb(0 0 0 / .25); }
+.dark .input { border-color: #3B4A5E; color: #F1F5F9; }
+.dark .input::placeholder { color: #8E9DB1; }
+.dark .th { background-color: #212D3B; border-color: #2D3A4A; }
+.dark .td { border-color: #243040; color: #CBD5E1; }
+.dark .placa { color: #CBD5E1; }
+.dark img { filter: brightness(.92); }
+.dark img[src$=".png"] { filter: none; }
+
+/* Tablas, scroll y entradas nativas */
+.dark ::-webkit-scrollbar { width: 12px; height: 12px; }
+.dark ::-webkit-scrollbar-thumb { background: #2F3E50; border-radius: 8px; border: 3px solid rgb(var(--c-fondo)); }
+
+@keyframes pulso { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.8); } }
+.pulso { animation: pulso 1.8s ease-in-out infinite; }
+@keyframes aparecer { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.aparecer { animation: aparecer .25s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pulso, .aparecer { animation: none; }
+  body { transition: none; }
+}

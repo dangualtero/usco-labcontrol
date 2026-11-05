@@ -1,0 +1,56 @@
+package co.edu.usco.labcontrol.service;
+
+import co.edu.usco.labcontrol.domain.*;
+import co.edu.usco.labcontrol.web.Dtos.*;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+import org.springframework.stereotype.Component;
+
+@Component
+public class Mapper {
+    private final Clock clock;
+
+    public Mapper(Clock clock) { this.clock = clock; }
+
+    public LocalDateTime ahora() { return LocalDateTime.now(clock); }
+
+    public static List<String> lista(String pipe) {
+        return pipe == null || pipe.isBlank() ? List.of()
+                : Arrays.stream(pipe.split("\\|")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+    }
+
+    public UsuarioDto usuario(Usuario u) {
+        return new UsuarioDto(u.getId(), u.getNombre(), u.getCorreo(), u.getRol().name(), u.getRol().grupo(),
+                u.getDocumento(), u.getPrograma(), u.getCodigoEstudiantil());
+    }
+
+    public UsuarioAdminDto usuarioAdmin(Usuario u) {
+        return new UsuarioAdminDto(u.getId(), u.getNombre(), u.getCorreo(), u.getRol().name(), u.getDocumento(),
+                u.getCodigoEstudiantil(), u.getPrograma(), u.isActivo());
+    }
+
+    public EquipoDto equipo(Equipo e) {
+        return new EquipoDto(e.getPlaca(), e.getNombre(), e.getMarca(), e.getModelo(), e.getNumeroSerie(),
+                e.getCategoria(), e.getLaboratorio(), e.getUbicacion(), e.getDescripcion(), lista(e.getSpecs()),
+                lista(e.getAccesorios()), e.getEstadoFisico(), e.getFotoUrl(), e.getEstado().name());
+    }
+
+    public PrestamoDto prestamo(Prestamo p) {
+        return new PrestamoDto(p.getId(), p.getCodigo(), p.getEquipo().getPlaca(), p.getEquipo().getNombre(),
+                p.getEquipo().getLaboratorio(), p.getEquipo().getFotoUrl(),
+                p.getSolicitante().getNombre(), p.getSolicitante().getDocumento(),
+                p.getAsignatura(), p.getDocente(), p.getEstado().name(), p.estaVencido(ahora()),
+                p.getFranjaInicio(), p.getFranjaFin(), p.getFechaSolicitud(), p.getFechaSalida(),
+                p.getFechaLimite(), p.getFechaEntrada(), p.getEstadoEntrada(), p.getObservaciones(),
+                p.getIncidencia(), nombre(p.getAuxiliarSalida()), nombre(p.getAuxiliarEntrada()), nombre(p.getCustodio()));
+    }
+
+    public HistorialDto historial(HistorialEvento h) {
+        return new HistorialDto(h.getId(), h.getFecha(), h.getTipo(), h.getPlaca(), h.getEquipoNombre(),
+                h.getLaboratorio(), h.getPrestamoCodigo(), h.getUsuarioNombre(), h.getAuxiliarNombre(), h.getDetalle());
+    }
+
+    private static String nombre(Usuario u) { return u == null ? null : u.getNombre(); }
+}

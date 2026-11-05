@@ -1,0 +1,38 @@
+# USCO LabControl · API REST.  Base de datos: MySQL 8 (obligatoria; no existe modo en memoria).
+# Todas las credenciales se aíslan por variables de entorno (RNF-03 / 4.6.3).
+# Los valores por defecto corresponden a la instancia local de desarrollo (ver iniciar-mysql.ps1 / README).
+server:
+  port: 8080
+
+spring:
+  application:
+    name: usco-labcontrol
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://127.0.0.1:3307/labcontrol?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Bogota&characterEncoding=utf8}
+    username: ${MYSQL_USER:labcontrol}
+    password: ${MYSQL_PASSWORD:LabControl#2026}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+labcontrol:
+  jwt:
+    # Mínimo 32 caracteres. En producción define LABCONTROL_JWT_SECRET.
+    secret: ${LABCONTROL_JWT_SECRET:dev-only-secret-change-me-usco-labcontrol-2026-0123456789abcdef}
+    expiracion-minutos: ${LABCONTROL_JWT_MINUTOS:60}
+    expiracion-recordar-dias: ${LABCONTROL_JWT_DIAS_RECORDAR:7}
+  cors:
+    origenes: ${LABCONTROL_CORS:http://localhost:5173,http://127.0.0.1:5173}
+  seed:
+    # Crea usuarios y equipos iniciales solo si la base está vacía.
+    habilitado: ${LABCONTROL_SEED:true}
+    # Préstamos, reservas e historial de ejemplo para que los paneles tengan información al iniciar.
+    historial-ejemplo: ${LABCONTROL_SEED_HISTORIAL:true}
+  reglas:
+    limite-equipos-por-usuario: 3

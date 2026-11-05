@@ -1,0 +1,627 @@
+{
+ "fecha": "2026-10-27T23:17:40",
+ "api": "http://127.0.0.1:8080/api",
+ "e2e": {
+  "total": 48,
+  "aprobados": 48,
+  "casos": [
+   {
+    "id": "E2E-01",
+    "descripcion": "login estudiante@usco.edu.co identifica el rol ESTUDIANTE",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-02",
+    "descripcion": "login docente@usco.edu.co identifica el rol DOCENTE",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-03",
+    "descripcion": "login auxiliar@usco.edu.co identifica el rol AUXILIAR",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-04",
+    "descripcion": "login coordinador@usco.edu.co identifica el rol COORDINADOR",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-05",
+    "descripcion": "login de un autor (ESTUDIANTE) con «recordar sesión»",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-06",
+    "descripcion": "credenciales inválidas → mensaje genérico (PS-08)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-07",
+    "descripcion": "correo vacío rechazado (PV-01)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-08",
+    "descripcion": "formato de correo inválido (PV-02)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-09",
+    "descripcion": "catálogo con 18 equipos y fotografía",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-10",
+    "descripcion": "ficha técnica completa (serie, ubicación, accesorios)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-11",
+    "descripcion": "el catálogo no expone quién tiene un equipo prestado (PS-05)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-12",
+    "descripcion": "estudiante solicita un préstamo",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-13",
+    "descripcion": "solicitud sin franja horaria rechazada (PV-03)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-14",
+    "descripcion": "equipo prestado no se puede solicitar (PV-05)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-15",
+    "descripcion": "auxiliar ve la solicitud pendiente",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-16",
+    "descripcion": "rechazo exige un motivo",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-17",
+    "descripcion": "auxiliar rechaza la solicitud con motivo",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-18",
+    "descripcion": "estudiante ve el rechazo en su historial",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-19",
+    "descripcion": "estudiante cancela una reserva pendiente (PV-06)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-20",
+    "descripcion": "placa con formato inválido (PU-07)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-21",
+    "descripcion": "placa inexistente (PV-04)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-22",
+    "descripcion": "límite de 3 equipos por usuario (PV-10)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-23",
+    "descripcion": "auxiliar registra la salida (búsqueda por código estudiantil)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-24",
+    "descripcion": "el equipo pasa a «Prestado» en el catálogo",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-25",
+    "descripcion": "daños sin observación rechazados",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-26",
+    "descripcion": "entrada con daños: mantenimiento + incidencia (PF-10)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-27",
+    "descripcion": "auxiliar reactiva el equipo",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-28",
+    "descripcion": "coordinador consulta KPIs desde MySQL",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-29",
+    "descripcion": "el historial registra los eventos (incidencia incluida)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-30",
+    "descripcion": "alertas: el panel identifica los 2 préstamos vencidos (RF-04)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-31",
+    "descripcion": "historial personal con préstamos devueltos y observaciones (RF-06)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-32",
+    "descripcion": "cierre de turno: lista los equipos pendientes (RF-09)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-33",
+    "descripcion": "cierre de turno: transfiere la custodia al auxiliar entrante (RF-09)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-34",
+    "descripcion": "tras transferir no quedan equipos bajo la custodia del auxiliar saliente",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-35",
+    "descripcion": "reporte exportado con campos personales enmascarados (PS-10)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-36",
+    "descripcion": "coordinador crea un equipo",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-37",
+    "descripcion": "placa duplicada rechazada",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-38",
+    "descripcion": "coordinador edita el equipo",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-39",
+    "descripcion": "coordinador envía el equipo a mantenimiento",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-40",
+    "descripcion": "no se puede dar de baja un equipo prestado",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-41",
+    "descripcion": "baja lógica (soft delete) del equipo (PS-08)",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-42",
+    "descripcion": "el equipo dado de baja sale del catálogo",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-43",
+    "descripcion": "la baja se conserva para auditoría",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-44",
+    "descripcion": "coordinador crea un usuario con rol",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-45",
+    "descripcion": "el usuario nuevo inicia sesión con su rol",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-46",
+    "descripcion": "el token de un usuario desactivado deja de funcionar",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-47",
+    "descripcion": "un usuario desactivado no puede iniciar sesión",
+    "ok": true,
+    "detalle": ""
+   },
+   {
+    "id": "E2E-48",
+    "descripcion": "cambio de contraseña exige la contraseña actual",
+    "ok": true,
+    "detalle": ""
+   }
+  ]
+ },
+ "seg": {
+  "peticiones": 110,
+  "violaciones": [],
+  "matriz": [
+   {
+    "endpoint": "GET /equipos",
+    "ESTUDIANTE": 200,
+    "DOCENTE": 200,
+    "AUXILIAR": 200,
+    "COORDINADOR": 200,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "GET /auth/yo",
+    "ESTUDIANTE": 200,
+    "DOCENTE": 200,
+    "AUXILIAR": 200,
+    "COORDINADOR": 200,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "POST /auth/cambiar-clave",
+    "ESTUDIANTE": 400,
+    "DOCENTE": 400,
+    "AUXILIAR": 400,
+    "COORDINADOR": 400,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "GET /prestamos/mis",
+    "ESTUDIANTE": 200,
+    "DOCENTE": 200,
+    "AUXILIAR": 403,
+    "COORDINADOR": 403,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "POST /prestamos/reservas",
+    "ESTUDIANTE": 400,
+    "DOCENTE": 400,
+    "AUXILIAR": 403,
+    "COORDINADOR": 403,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "DELETE /prestamos/reservas/999999",
+    "ESTUDIANTE": 404,
+    "DOCENTE": 404,
+    "AUXILIAR": 403,
+    "COORDINADOR": 403,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "GET /ventanilla/panel",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 200,
+    "COORDINADOR": 403,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "GET /ventanilla/cierre-turno",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 200,
+    "COORDINADOR": 403,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "POST /ventanilla/salida",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 400,
+    "COORDINADOR": 403,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "POST /ventanilla/entrada",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 404,
+    "COORDINADOR": 403,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "POST /ventanilla/reservas/999999/rechazar",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 400,
+    "COORDINADOR": 403,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "POST /ventanilla/equipos/USCO-EQ-999/estado",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 404,
+    "COORDINADOR": 403,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "GET /coordinador/kpis",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 403,
+    "COORDINADOR": 200,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "GET /coordinador/historial",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 403,
+    "COORDINADOR": 200,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "GET /coordinador/reporte.csv",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 403,
+    "COORDINADOR": 200,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "GET /coordinador/equipos",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 403,
+    "COORDINADOR": 200,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "POST /coordinador/equipos",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 403,
+    "COORDINADOR": 400,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "PUT /coordinador/equipos/USCO-EQ-999",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 403,
+    "COORDINADOR": 404,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "POST /coordinador/equipos/USCO-EQ-999/baja",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 403,
+    "COORDINADOR": 400,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "GET /coordinador/usuarios",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 403,
+    "COORDINADOR": 200,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "POST /coordinador/usuarios",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 403,
+    "COORDINADOR": 400,
+    "SIN SESIÓN": 401
+   },
+   {
+    "endpoint": "POST /coordinador/usuarios/999999/clave",
+    "ESTUDIANTE": 403,
+    "DOCENTE": 403,
+    "AUXILIAR": 403,
+    "COORDINADOR": 404,
+    "SIN SESIÓN": 401
+   }
+  ]
+ },
+ "pc": {
+  "rondas": 8,
+  "simultaneas_por_ronda": 12,
+  "solicitudes_totales": 96,
+  "exitosas_totales": 8,
+  "dobles_asignaciones": 0,
+  "detalle": [
+   {
+    "placa": "USCO-EQ-101",
+    "solicitudes": 12,
+    "exitosas": 1,
+    "rechazadas": 11,
+    "codigos_rechazo": [
+     409
+    ],
+    "prestamos_activos_en_bd": 1
+   },
+   {
+    "placa": "USCO-EQ-200",
+    "solicitudes": 12,
+    "exitosas": 1,
+    "rechazadas": 11,
+    "codigos_rechazo": [
+     409
+    ],
+    "prestamos_activos_en_bd": 1
+   },
+   {
+    "placa": "USCO-EQ-203",
+    "solicitudes": 12,
+    "exitosas": 1,
+    "rechazadas": 11,
+    "codigos_rechazo": [
+     409
+    ],
+    "prestamos_activos_en_bd": 1
+   },
+   {
+    "placa": "USCO-EQ-301",
+    "solicitudes": 12,
+    "exitosas": 1,
+    "rechazadas": 11,
+    "codigos_rechazo": [
+     409
+    ],
+    "prestamos_activos_en_bd": 1
+   },
+   {
+    "placa": "USCO-EQ-302",
+    "solicitudes": 12,
+    "exitosas": 1,
+    "rechazadas": 11,
+    "codigos_rechazo": [
+     409
+    ],
+    "prestamos_activos_en_bd": 1
+   },
+   {
+    "placa": "USCO-EQ-400",
+    "solicitudes": 12,
+    "exitosas": 1,
+    "rechazadas": 11,
+    "codigos_rechazo": [
+     409
+    ],
+    "prestamos_activos_en_bd": 1
+   },
+   {
+    "placa": "USCO-EQ-403",
+    "solicitudes": 12,
+    "exitosas": 1,
+    "rechazadas": 11,
+    "codigos_rechazo": [
+     409
+    ],
+    "prestamos_activos_en_bd": 1
+   },
+   {
+    "placa": "USCO-EQ-104",
+    "solicitudes": 12,
+    "exitosas": 1,
+    "rechazadas": 11,
+    "codigos_rechazo": [
+     409
+    ],
+    "prestamos_activos_en_bd": 1
+   }
+  ]
+ },
+ "pr": [
+  {
+   "operacion": "Inicio de sesión (BCrypt)",
+   "peticion": "POST /auth/login",
+   "n": 120,
+   "p50_ms": 141.3,
+   "p95_ms": 145.5,
+   "max_ms": 147.0
+  },
+  {
+   "operacion": "Consulta de disponibilidad (catálogo)",
+   "peticion": "GET /equipos",
+   "n": 120,
+   "p50_ms": 11.1,
+   "p95_ms": 12.6,
+   "max_ms": 16.2
+  },
+  {
+   "operacion": "Ficha técnica de un equipo",
+   "peticion": "GET /equipos/USCO-EQ-103",
+   "n": 120,
+   "p50_ms": 16.8,
+   "p95_ms": 19.4,
+   "max_ms": 23.7
+  },
+  {
+   "operacion": "Historial personal del usuario",
+   "peticion": "GET /prestamos/mis",
+   "n": 120,
+   "p50_ms": 17.6,
+   "p95_ms": 20.8,
+   "max_ms": 36.8
+  },
+  {
+   "operacion": "Panel de ventanilla",
+   "peticion": "GET /ventanilla/panel",
+   "n": 120,
+   "p50_ms": 22.0,
+   "p95_ms": 24.5,
+   "max_ms": 32.2
+  },
+  {
+   "operacion": "KPIs del coordinador",
+   "peticion": "GET /coordinador/kpis",
+   "n": 120,
+   "p50_ms": 28.5,
+   "p95_ms": 37.4,
+   "max_ms": 48.1
+  },
+  {
+   "operacion": "Historial de movimientos",
+   "peticion": "GET /coordinador/historial",
+   "n": 120,
+   "p50_ms": 10.0,
+   "p95_ms": 11.8,
+   "max_ms": 19.7
+  }
+ ]
+}

@@ -1,0 +1,22 @@
+# MySQL 8 para la API de USCO LabControl (alternativa a iniciar-mysql.ps1).
+#   1) Copia .env.example a .env y define las contraseñas.
+#   2) docker compose up -d
+#   3) En /backend:  MYSQL_URL=jdbc:mysql://127.0.0.1:3306/labcontrol?useSSL=false MYSQL_PASSWORD=<la misma> mvn spring-boot:run
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: usco-labcontrol-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: labcontrol
+      MYSQL_USER: labcontrol
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Define MYSQL_PASSWORD en .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD en .env}
+      TZ: America/Bogota
+    command: --default-time-zone=-05:00 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --log-bin-trust-function-creators=1
+    ports:
+      - "3306:3306"
+    volumes:
+      - labcontrol-data:/var/lib/mysql
+volumes:
+  labcontrol-data:
