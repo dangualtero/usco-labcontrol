@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, setToken, estaConectado, suscribirConexion, reintentarTodo } from '../api/index.js'
+import { api, setToken, getSede, estaConectado, suscribirConexion, reintentarTodo } from '../api/index.js'
 import { homeDe } from '../lib/constantes.js'
 
 const Ctx = createContext(null)
@@ -63,7 +63,9 @@ export function AuthProvider({ children }) {
     borrar()
     setSesion(null)
     setRestante(null)
-    nav('/login', { replace: true, state: { cierre: motivo ?? 'manual' } })
+    // Vuelve al ingreso de la misma sede (/pitalito/login); sin sede, a la pantalla «Elige tu sede».
+    const s = getSede()
+    nav(s ? `/${s}/login` : '/', { replace: true, state: { cierre: motivo ?? 'manual' } })
   }, [nav])
 
   // Inactividad con cuenta regresiva visible (solo sesiones sin «recordar»)
@@ -86,7 +88,8 @@ export function AuthProvider({ children }) {
   const valor = useMemo(() => ({
     usuario: sesion?.usuario ?? null,
     grupo: sesion?.usuario?.grupo ?? null,
-    home: sesion ? homeDe(sesion.usuario.grupo) : '/login',
+    // Inicio del rol en su sede (el Coordinador general, en la sede que esté viendo).
+    home: sesion ? homeDe(sesion.usuario.grupo, sesion.usuario.sede ?? getSede()) : '/',
     validando, conectado, restante, iniciar, cerrar, continuar, reintentar: () => { reintentarTodo(); validar() },
   }), [sesion, validando, conectado, restante, iniciar, cerrar, continuar, validar])
 

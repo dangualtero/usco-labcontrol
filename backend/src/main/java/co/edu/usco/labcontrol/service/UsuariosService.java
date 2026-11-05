@@ -16,18 +16,24 @@ public class UsuariosService {
     private final UsuarioRepository usuarios;
     private final PasswordEncoder encoder;
     private final Mapper mapper;
+    private final SedeContexto sedes;
 
-    public UsuariosService(UsuarioRepository usuarios, PasswordEncoder encoder, Mapper mapper) {
-        this.usuarios = usuarios; this.encoder = encoder; this.mapper = mapper;
+    public UsuariosService(UsuarioRepository usuarios, PasswordEncoder encoder, Mapper mapper, SedeContexto sedes) {
+        this.usuarios = usuarios; this.encoder = encoder; this.mapper = mapper; this.sedes = sedes;
     }
 
+    /** Usuarios de la sede seleccionada + los coordinadores generales (que no tienen sede). */
     @Transactional(readOnly = true)
-    public List<UsuarioAdminDto> listar() {
-        return usuarios.findAllByOrderByRolAscNombreAsc().stream().map(mapper::usuarioAdmin).toList();
+    public List<UsuarioAdminDto> listar(Long actorId) {
+        var sede = sedes.de(actorId);
+        return usuarios.findAllByOrderByRolAscNombreAsc().stream()
+                .filter(u -> u.getSede() == null || sede.es(u.getSede()))
+                .map(mapper::usuarioAdmin).toList();
     }
 
+    /** Crea el usuario en la sede seleccionada. El rol COORDINADOR es general: queda sin sede y administra todas. */
     @Transactional
-    public UsuarioAdminDto crear(UsuarioRequest r) {
+    public UsuarioAdminDto crear(Long actorId, UsuarioRequest r) {
         String nombre = r.nombre() == null ? "" : r.nombre().trim();
         if (nombre.length() < 3) throw ApiException.badRequest("El nombre es obligatorio");
         String correo = r.correo() == null ? "" : r.correo().trim().toLowerCase();
@@ -44,6 +50,7 @@ public class UsuariosService {
         AuthService.validarClave(r.password());
         Usuario u = new Usuario(nombre, correo, encoder.encode(r.password()), rol, doc, codigo,
                 r.programa() == null || r.programa().isBlank() ? null : r.programa().trim());
+        if (rol != Rol.COORDINADOR) u.setSede(sedes.de(actorId));
         return mapper.usuarioAdmin(usuarios.save(u));
     }
 

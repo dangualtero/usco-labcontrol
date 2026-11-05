@@ -33,6 +33,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/auth/login", "/api/salud").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/sedes", "/api/imagenes/*").permitAll()
                 .requestMatchers("/api/auth/**").authenticated()
                 .requestMatchers("/api/equipos/**").authenticated()
                 .requestMatchers("/api/prestamos/**").hasAnyRole("ESTUDIANTE", "DOCENTE")
@@ -57,7 +58,7 @@ public class SecurityConfig {
         CorsConfiguration c = new CorsConfiguration();
         c.setAllowedOrigins(Arrays.stream(origenes.split(",")).map(String::trim).toList());
         c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        c.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        c.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Sede"));
         UrlBasedCorsConfigurationSource s = new UrlBasedCorsConfigurationSource();
         s.registerCorsConfiguration("/api/**", c);
         return s;

@@ -31,13 +31,14 @@ public class PrestamoService {
     private final UsuarioRepository usuarios;
     private final HistorialRepository historial;
     private final Mapper mapper;
+    private final SedeContexto sedes;
     private final int limite;
 
     public PrestamoService(EquipoRepository equipos, PrestamoRepository prestamos, UsuarioRepository usuarios,
-                           HistorialRepository historial, Mapper mapper,
+                           HistorialRepository historial, Mapper mapper, SedeContexto sedes,
                            @Value("${labcontrol.reglas.limite-equipos-por-usuario}") int limite) {
         this.equipos = equipos; this.prestamos = prestamos; this.usuarios = usuarios;
-        this.historial = historial; this.mapper = mapper; this.limite = limite;
+        this.historial = historial; this.mapper = mapper; this.sedes = sedes; this.limite = limite;
     }
 
     // ------------------------------------------------------------------ Estudiante / Docente
@@ -54,7 +55,8 @@ public class PrestamoService {
         }
         if (r.placa() == null || r.placa().isBlank()) throw ApiException.badRequest("Seleccione un equipo");
 
-        Equipo e = equipos.findActivoForUpdate(r.placa()).orElseThrow(() -> ApiException.notFound(MSG_NO_EXISTE));
+        Equipo e = equipos.findActivoForUpdate(r.placa()).filter(x -> sedes.pertenece(x, sedes.de(u)))
+                .orElseThrow(() -> ApiException.notFound(MSG_NO_EXISTE));
         if (e.getEstado() != EstadoEquipo.DISPONIBLE) throw ApiException.conflict("No disponible");
         if (prestamos.countBySolicitanteIdAndEstadoIn(u.getId(), VIGENTES) >= limite) throw ApiException.conflict(MSG_LIMITE);
         if (!prestamos.traslapes(e.getId(), r.inicio(), r.fin()).isEmpty()) {
@@ -88,10 +90,13 @@ public class PrestamoService {
     // ------------------------------------------------------------------ Ventanilla (Auxiliar)
 
     @Transactional(readOnly = true)
-    public PanelDto panel() {
-        List<PrestamoDto> activos = prestamos.findByEstadoOrderByFechaLimiteAsc(EstadoPrestamo.ACTIVO).stream().map(mapper::prestamo).toList();
-        List<PrestamoDto> reservas = prestamos.findByEstadoOrderByFranjaInicioAsc(EstadoPrestamo.RESERVADO).stream().map(mapper::prestamo).toList();
-        var lista = equipos.findByActivoTrueOrderByLaboratorioAscPlacaAsc();
+    public PanelDto panel(Long auxiliarId) {
+        Sede sede = sedes.de(auxiliarId);
+        List<PrestamoDto> activos = prestamos.findByEstadoOrderByFechaLimiteAsc(EstadoPrestamo.ACTIVO).stream()
+                .filter(p -> sedes.pertenece(p.getEquipo(), sede)).map(mapper::prestamo).toList();
+        List<PrestamoDto> reservas = prestamos.findByEstadoOrderByFranjaInicioAsc(EstadoPrestamo.RESERVADO).stream()
+                .filter(p -> sedes.pertenece(p.getEquipo(), sede)).map(mapper::prestamo).toList();
+        var lista = equipos.findBySedeIdAndActivoTrueOrderByLaboratorioAscPlacaAsc(sede.getId());
         long disp = lista.stream().filter(e -> e.getEstado() == EstadoEquipo.DISPONIBLE).count();
         long pres = lista.stream().filter(e -> e.getEstado() == EstadoEquipo.PRESTADO).count();
         long mant = lista.stream().filter(e -> e.getEstado() == EstadoEquipo.MANTENIMIENTO).count();
@@ -100,19 +105,20 @@ public class PrestamoService {
     }
 
     @Transactional(readOnly = true)
-    public SolicitudesUsuarioDto solicitudes(String documento) {
-        Usuario u = buscarSolicitante(documento);
+    public SolicitudesUsuarioDto solicitudes(Long auxiliarId, String documento) {
+        Usuario u = buscarSolicitante(documento, sedes.de(auxiliarId));
         List<PrestamoDto> reservas = prestamos.findBySolicitanteIdAndEstadoIn(u.getId(), Set.of(EstadoPrestamo.RESERVADO))
                 .stream().map(mapper::prestamo).toList();
         long activos = prestamos.countBySolicitanteIdAndEstadoIn(u.getId(), Set.of(EstadoPrestamo.ACTIVO));
         return new SolicitudesUsuarioDto(u.getNombre(), u.getDocumento(), u.getCodigoEstudiantil(), u.getPrograma(), activos, limite, reservas);
     }
 
-    /** Busca por documento o por código estudiantil (solo estudiantes y docentes activos). */
-    private Usuario buscarSolicitante(String criterio) {
+    /** Busca por documento o por código estudiantil (solo estudiantes y docentes activos DE LA MISMA SEDE). */
+    private Usuario buscarSolicitante(String criterio, Sede sede) {
         String c = criterio == null ? "" : criterio.trim();
         return usuarios.findByDocumentoOrCodigoEstudiantil(c, c)
                 .filter(x -> x.isActivo() && (x.getRol() == Rol.ESTUDIANTE || x.getRol() == Rol.DOCENTE))
+                .filter(x -> x.getSede() == null ? sede.es(sedes.principal()) : sede.es(x.getSede()))
                 .orElseThrow(() -> ApiException.notFound("No se encontró un estudiante o docente con ese código o documento"));
     }
 
@@ -121,7 +127,9 @@ public class PrestamoService {
     public PrestamoDto rechazarReserva(Long auxiliarId, Long prestamoId, String motivo) {
         Usuario aux = usuarios.findById(auxiliarId).orElseThrow(() -> ApiException.notFound("Auxiliar no encontrado"));
         if (motivo == null || motivo.trim().length() < 5) throw ApiException.badRequest("Indique el motivo del rechazo");
-        Prestamo p = prestamos.findById(prestamoId == null ? -1L : prestamoId).orElseThrow(() -> ApiException.notFound("Solicitud no encontrada"));
+        Prestamo p = prestamos.findById(prestamoId == null ? -1L : prestamoId)
+                .filter(x -> sedes.pertenece(x.getEquipo(), sedes.de(aux)))
+                .orElseThrow(() -> ApiException.notFound("Solicitud no encontrada"));
         if (p.getEstado() != EstadoPrestamo.RESERVADO) throw ApiException.conflict("Solo se pueden rechazar solicitudes pendientes");
         p.setEstado(EstadoPrestamo.RECHAZADO);
         p.setObservaciones("Rechazada por " + aux.getNombre() + ": " + motivo.trim());
@@ -139,9 +147,11 @@ public class PrestamoService {
         }
         int horas = r.horas() == null ? 2 : r.horas();
         if (horas < 1 || horas > 8) throw ApiException.badRequest("La duración del préstamo debe estar entre 1 y 8 horas");
-        Usuario sol = buscarSolicitante(r.documento());
+        Sede sede = sedes.de(aux);
+        Usuario sol = buscarSolicitante(r.documento(), sede);
 
-        Equipo e = equipos.findActivoForUpdate(placa).orElseThrow(() -> ApiException.notFound(MSG_NO_EXISTE));
+        Equipo e = equipos.findActivoForUpdate(placa).filter(x -> sedes.pertenece(x, sede))
+                .orElseThrow(() -> ApiException.notFound(MSG_NO_EXISTE));
         switch (e.getEstado()) {
             case PRESTADO -> throw ApiException.conflict("El equipo ya se encuentra prestado");
             case MANTENIMIENTO -> throw ApiException.conflict("El equipo está en mantenimiento y no puede prestarse");
@@ -178,6 +188,7 @@ public class PrestamoService {
     public EntradaResponse entrada(Long auxiliarId, EntradaRequest r) {
         Usuario aux = usuarios.findById(auxiliarId).orElseThrow(() -> ApiException.notFound("Auxiliar no encontrado"));
         Prestamo p = prestamos.findById(r.prestamoId() == null ? -1L : r.prestamoId())
+                .filter(x -> sedes.pertenece(x.getEquipo(), sedes.de(aux)))
                 .orElseThrow(() -> ApiException.notFound("Préstamo no encontrado"));
         if (p.getEstado() != EstadoPrestamo.ACTIVO) throw ApiException.conflict("El préstamo no está activo");
 
@@ -230,7 +241,7 @@ public class PrestamoService {
     public CierreTurnoDto cierreTurno(Long auxiliarId) {
         var pendientes = prestamos.findByEstadoAndCustodioIdOrderByFechaLimiteAsc(EstadoPrestamo.ACTIVO, auxiliarId)
                 .stream().map(mapper::prestamo).toList();
-        var otros = usuarios.findByRolAndActivoTrue(Rol.AUXILIAR).stream()
+        var otros = usuarios.findByRolAndActivoTrueAndSedeId(Rol.AUXILIAR, sedes.de(auxiliarId).getId()).stream()
                 .filter(a -> !a.getId().equals(auxiliarId)).map(a -> new AuxiliarDto(a.getId(), a.getNombre())).toList();
         return new CierreTurnoDto(pendientes, otros);
     }
@@ -239,7 +250,8 @@ public class PrestamoService {
     public TransferenciaResponse transferirCustodia(Long auxiliarId, Long destinoId) {
         Usuario aux = usuarios.findById(auxiliarId).orElseThrow();
         if (destinoId == null || destinoId.equals(auxiliarId)) throw ApiException.badRequest("Seleccione el auxiliar que recibe el turno");
-        Usuario destino = usuarios.findById(destinoId).filter(u -> u.getRol() == Rol.AUXILIAR)
+        Sede sede = sedes.de(aux);
+        Usuario destino = usuarios.findById(destinoId).filter(u -> u.getRol() == Rol.AUXILIAR && sede.es(u.getSede()))
                 .orElseThrow(() -> ApiException.badRequest("El auxiliar de destino no es válido"));
         var pendientes = prestamos.findByEstadoAndCustodioIdOrderByFechaLimiteAsc(EstadoPrestamo.ACTIVO, auxiliarId);
         for (Prestamo p : pendientes) {

@@ -3,6 +3,7 @@ import { KeyRound, Plus, RefreshCw, Search, UserCheck, UserX } from 'lucide-reac
 import { api } from '../../api/index.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
+import { useSede } from '../../context/SedeContext.jsx'
 import { useDatos } from '../../lib/hooks.js'
 import { REGEX_CORREO, norm } from '../../lib/constantes.js'
 import { Campo, Cargando, ErrorCaja, Modal } from '../../components/ui.jsx'
@@ -16,6 +17,7 @@ const claveOk = (c) => c.length >= 8 && /[A-Za-z]/.test(c) && /\d/.test(c)
 export default function Usuarios() {
   const { usuario } = useAuth()
   const toast = useToast()
+  const { sede } = useSede()
   const { datos, error, cargando, recargar } = useDatos(() => api.usuarios(), [], { cada: 30000 })
   const [q, setQ] = useState('')
   const [rol, setRol] = useState('todos')
@@ -64,11 +66,11 @@ export default function Usuarios() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-usco">Administración</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-usco">Administración · {sede?.nombre}</p>
           <h1 className="text-2xl font-extrabold sm:text-3xl">Usuarios y roles</h1>
-          <p className="text-sm text-pizarra">El rol asignado aquí determina automáticamente el panel al que accede cada persona al iniciar sesión.</p>
+          <p className="text-sm text-pizarra">El rol asignado aquí determina automáticamente el panel al que accede cada persona al iniciar sesión. Se listan los usuarios de la {sede?.nombre} y los coordinadores generales.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           <button onClick={recargar} disabled={cargando} className="btn-outline" aria-label="Actualizar usuarios"><RefreshCw className={`h-4 w-4 ${cargando ? 'animate-spin' : ''}`} aria-hidden="true" /> Actualizar</button>
           <button onClick={() => { setNuevo(NUEVO); setErrores({}); setErrorSrv('') }} className="btn-primary"><Plus className="h-4 w-4" aria-hidden="true" /> Nuevo usuario</button>
         </div>
@@ -111,7 +113,7 @@ export default function Usuarios() {
         </div>
       )}
 
-      <Modal abierto={!!nuevo} onCerrar={() => setNuevo(null)} titulo="Nuevo usuario" subtitulo="La cuenta quedará activa y podrá iniciar sesión de inmediato" ancho="max-w-2xl"
+      <Modal abierto={!!nuevo} onCerrar={() => setNuevo(null)} titulo="Nuevo usuario" subtitulo={nuevo?.rol === 'COORDINADOR' ? 'Coordinador general: administra todas las sedes' : `Pertenecerá a la ${sede?.nombre ?? 'sede actual'} e ingresará por /${sede?.slug ?? ''}`} ancho="max-w-2xl"
         pie={<>
           <button type="button" className="btn-outline" onClick={() => setNuevo(null)}>Cancelar</button>
           <button type="submit" form="form-usuario" className="btn-primary" disabled={enviando}><Plus className="h-4 w-4" aria-hidden="true" /> {enviando ? 'Creando…' : 'Crear usuario'}</button>

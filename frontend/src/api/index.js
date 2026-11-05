@@ -11,6 +11,12 @@ export class ApiError extends Error {
 let token = null
 export const setToken = (t) => { token = t }
 
+// Sede activa (segmento de la URL: /neiva, /pitalito…). Se envía en cada petición en la cabecera X-Sede.
+// El servidor solo la usa para el Coordinador general; a los demás usuarios siempre les aplica su propia sede.
+let sede = null
+export const setSede = (s) => { sede = s || null }
+export const getSede = () => sede
+
 // ---- Estado de conexión con la API (lo consume el banner global) ----
 let conectado = true
 const oyentes = new Set()
@@ -24,7 +30,7 @@ export const suscribirConexion = (f) => { oyentes.add(f); return () => oyentes.d
 /** Pide a todas las pantallas que vuelvan a consultar la API. */
 export const reintentarTodo = () => window.dispatchEvent(new Event('labcontrol:reintentar'))
 
-async function pedir(metodo, ruta, { cuerpo, params, texto } = {}) {
+async function pedir(metodo, ruta, { cuerpo, params, texto, form } = {}) {
   const qs = params
     ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')).toString()
     : ''
@@ -32,8 +38,13 @@ async function pedir(metodo, ruta, { cuerpo, params, texto } = {}) {
   try {
     res = await fetch(`/api${ruta}${qs}`, {
       method: metodo,
-      headers: { ...(cuerpo !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: cuerpo !== undefined ? JSON.stringify(cuerpo) : undefined,
+      headers: {
+        ...(cuerpo !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(sede ? { 'X-Sede': sede } : {}),
+      },
+      // FormData: el navegador pone el Content-Type multipart con su boundary
+      body: form ?? (cuerpo !== undefined ? JSON.stringify(cuerpo) : undefined),
     })
   } catch {
     marcar(false)
@@ -62,7 +73,8 @@ const todos = (v) => (v === 'todos' ? '' : v)
 export const api = {
   // Autenticación
   salud: () => get('/salud'),
-  login: ({ email, password, recordar }) => post('/auth/login', { email, password, recordar: !!recordar }),
+  login: ({ email, password, recordar }) => post('/auth/login', { email, password, recordar: !!recordar, sede }),
+  sedes: () => get('/sedes'),
   yo: () => get('/auth/yo'),
   cambiarClave: (actual, nueva) => post('/auth/cambiar-clave', { actual, nueva }),
 
@@ -98,4 +110,23 @@ export const api = {
   crearUsuario: (r) => post('/coordinador/usuarios', r),
   usuarioActivo: (id, activo) => put(`/coordinador/usuarios/${id}/activo`, { activo }),
   usuarioClave: (id, nueva) => post(`/coordinador/usuarios/${id}/clave`, { nueva }),
+
+  // Coordinador · sedes
+  sedesAdmin: () => get('/coordinador/sedes'),
+  crearSede: (r) => post('/coordinador/sedes', r),
+  actualizarSede: (slug, r) => put(`/coordinador/sedes/${encodeURIComponent(slug)}`, r),
+  activarSede: (slug, activo) => put(`/coordinador/sedes/${encodeURIComponent(slug)}/activa`, { activo }),
+
+  // Coordinador · presupuesto (de la sede activa)
+  presupuesto: () => get('/coordinador/presupuesto'),
+  presupuestoResumen: () => get('/coordinador/presupuesto/resumen'),
+  registrarMovimiento: (r) => post('/coordinador/presupuesto/movimientos', r),
+  anularMovimiento: (id, motivo) => post(`/coordinador/presupuesto/movimientos/${id}/anular`, { motivo }),
+
+  // Coordinador · fotografías desde el computador o el celular
+  subirImagen: (archivo) => {
+    const f = new FormData()
+    f.append('archivo', archivo, archivo.name || 'foto.jpg')
+    return pedir('POST', '/coordinador/imagenes', { form: f })
+  },
 }

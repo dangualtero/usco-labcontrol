@@ -23,19 +23,22 @@ public class CoordinadorService {
     private final HistorialRepository historial;
     private final UsuarioRepository usuarios;
     private final Mapper mapper;
+    private final SedeContexto sedes;
 
     public CoordinadorService(EquipoRepository equipos, PrestamoRepository prestamos, HistorialRepository historial,
-                              UsuarioRepository usuarios, Mapper mapper) {
+                              UsuarioRepository usuarios, Mapper mapper, SedeContexto sedes) {
         this.equipos = equipos; this.prestamos = prestamos; this.historial = historial;
-        this.usuarios = usuarios; this.mapper = mapper;
+        this.usuarios = usuarios; this.mapper = mapper; this.sedes = sedes;
     }
 
     @Transactional(readOnly = true)
-    public KpisDto kpis(LocalDate desde, LocalDate hasta) {
+    public KpisDto kpis(Long actorId, LocalDate desde, LocalDate hasta) {
+        Sede sede = sedes.de(actorId);
         LocalDate h = hasta != null ? hasta : mapper.ahora().toLocalDate();
         LocalDate d = desde != null ? desde : h.minusDays(29);
-        var rango = prestamos.conSalidaEntre(d.atStartOfDay(), h.plusDays(1).atStartOfDay());
-        var activosEq = equipos.findByActivoTrueOrderByLaboratorioAscPlacaAsc();
+        var rango = prestamos.conSalidaEntre(d.atStartOfDay(), h.plusDays(1).atStartOfDay()).stream()
+                .filter(p -> sedes.pertenece(p.getEquipo(), sede)).toList();
+        var activosEq = equipos.findBySedeIdAndActivoTrueOrderByLaboratorioAscPlacaAsc(sede.getId());
         LocalDateTime ahora = mapper.ahora();
 
         var devueltos = rango.stream().filter(p -> p.getEstado() == EstadoPrestamo.DEVUELTO).toList();
@@ -53,7 +56,8 @@ public class CoordinadorService {
             serie.add(new SerieDiaDto(x.toString(), porDia.getOrDefault(x, 0L)));
         }
 
-        var activos = prestamos.findByEstadoOrderByFechaLimiteAsc(EstadoPrestamo.ACTIVO);
+        var activos = prestamos.findByEstadoOrderByFechaLimiteAsc(EstadoPrestamo.ACTIVO).stream()
+                .filter(p -> sedes.pertenece(p.getEquipo(), sede)).toList();
         return new KpisDto(activosEq.size(),
                 activosEq.stream().filter(e -> e.getEstado() == EstadoEquipo.DISPONIBLE).count(),
                 activosEq.stream().filter(e -> e.getEstado() == EstadoEquipo.PRESTADO).count(),
@@ -64,11 +68,13 @@ public class CoordinadorService {
     }
 
     @Transactional(readOnly = true)
-    public List<HistorialDto> historial(LocalDate desde, LocalDate hasta, String laboratorio, String q) {
+    public List<HistorialDto> historial(Long actorId, LocalDate desde, LocalDate hasta, String laboratorio, String q) {
+        Sede sede = sedes.de(actorId);
         LocalDate h = hasta != null ? hasta : mapper.ahora().toLocalDate();
         LocalDate d = desde != null ? desde : h.minusDays(29);
         String nq = CatalogoService.normalizar(q);
         return historial.entre(d.atStartOfDay(), h.plusDays(1).atStartOfDay()).stream()
+                .filter(ev -> sedes.pertenece(ev.getSede(), sede))
                 .filter(ev -> laboratorio == null || laboratorio.isBlank() || laboratorio.equalsIgnoreCase("todos")
                         || laboratorio.equalsIgnoreCase(ev.getLaboratorio()))
                 .filter(ev -> nq.isEmpty() || CatalogoService.normalizar(String.join(" ",
@@ -82,10 +88,10 @@ public class CoordinadorService {
      * responsable de un equipo y enmascara documento, teléfono y dirección de residencia.
      */
     @Transactional(readOnly = true)
-    public String reporteCsv(LocalDate desde, LocalDate hasta, String laboratorio) {
+    public String reporteCsv(Long actorId, LocalDate desde, LocalDate hasta, String laboratorio) {
         StringBuilder sb = new StringBuilder("﻿");
         sb.append("Fecha;Tipo;Placa;Equipo;Laboratorio;Préstamo;Usuario;Auxiliar;Detalle;Documento;Teléfono;Dirección\r\n");
-        for (HistorialDto ev : historial(desde, hasta, laboratorio, null)) {
+        for (HistorialDto ev : historial(actorId, desde, hasta, laboratorio, null)) {
             sb.append(String.join(";", celda(ev.fecha().format(FMT)), celda(ev.tipo()), celda(ev.placa()), celda(ev.equipo()),
                     celda(ev.laboratorio()), celda(ev.prestamo()), celda(ev.usuario()), celda(ev.auxiliar()),
                     celda(ev.detalle()), MASCARA, MASCARA, MASCARA)).append("\r\n");
@@ -94,9 +100,9 @@ public class CoordinadorService {
     }
 
     @Transactional(readOnly = true)
-    public List<EquipoAdminDto> equiposAdmin() {
+    public List<EquipoAdminDto> equiposAdmin(Long actorId) {
         List<EquipoAdminDto> out = new ArrayList<>();
-        for (Equipo e : equipos.findAll(org.springframework.data.domain.Sort.by("laboratorio", "placa"))) {
+        for (Equipo e : equipos.findBySedeIdOrderByLaboratorioAscPlacaAsc(sedes.de(actorId).getId())) {
             String ultimo = prestamos.findByEquipoPlacaAndEstadoInOrderByFechaSolicitudDesc(e.getPlaca(),
                     Set.of(EstadoPrestamo.ACTIVO, EstadoPrestamo.DEVUELTO)).stream().findFirst()
                     .map(p -> p.getSolicitante().getNombre()).orElse(null);
@@ -110,7 +116,8 @@ public class CoordinadorService {
     public EquipoAdminDto baja(Long coordinadorId, String placa, String motivo) {
         Usuario c = usuarios.findById(coordinadorId).orElseThrow();
         if (motivo == null || motivo.trim().length() < 5) throw ApiException.badRequest("Indique el motivo de la baja");
-        Equipo e = equipos.findActivoForUpdate(placa).orElseThrow(() -> ApiException.notFound("El equipo no existe en el inventario activo"));
+        Equipo e = equipos.findActivoForUpdate(placa).filter(x -> sedes.pertenece(x, sedes.de(c)))
+                .orElseThrow(() -> ApiException.notFound("El equipo no existe en el inventario activo"));
         if (e.getEstado() == EstadoEquipo.PRESTADO) throw ApiException.conflict("No se puede dar de baja un equipo que está prestado");
         LocalDateTime ahora = mapper.ahora();
         e.darDeBaja(motivo.trim(), ahora);

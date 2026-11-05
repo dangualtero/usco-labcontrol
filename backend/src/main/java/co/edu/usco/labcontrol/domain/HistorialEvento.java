@@ -25,13 +25,18 @@ public class HistorialEvento {
     @Column(length = 120) private String usuarioNombre;
     @Column(length = 120) private String auxiliarNombre;
     @Column(length = 600) private String detalle;
+    /** Slug de la sede del equipo. Los eventos anteriores a las sedes quedan en null y pertenecen a la sede principal. */
+    @Column(length = 40) private String sede;
 
     protected HistorialEvento() {}
 
     public HistorialEvento(LocalDateTime fecha, String tipo, Equipo e, String prestamoCodigo,
                            String usuarioNombre, String auxiliarNombre, String detalle) {
         this.fecha = fecha; this.tipo = tipo;
-        if (e != null) { this.placa = e.getPlaca(); this.equipoNombre = e.getNombre(); this.laboratorio = e.getLaboratorio(); }
+        if (e != null) {
+            this.placa = e.getPlaca(); this.equipoNombre = e.getNombre(); this.laboratorio = e.getLaboratorio();
+            this.sede = e.getSede() == null ? null : e.getSede().getSlug();
+        }
         this.prestamoCodigo = prestamoCodigo; this.usuarioNombre = usuarioNombre;
         this.auxiliarNombre = auxiliarNombre; this.detalle = detalle;
     }
@@ -46,4 +51,5 @@ public class HistorialEvento {
     public String getUsuarioNombre() { return usuarioNombre; }
     public String getAuxiliarNombre() { return auxiliarNombre; }
     public String getDetalle() { return detalle; }
+    public String getSede() { return sede; }
 }

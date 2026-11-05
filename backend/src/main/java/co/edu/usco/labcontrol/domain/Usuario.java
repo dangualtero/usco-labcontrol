@@ -33,6 +33,10 @@ public class Usuario {
     @Column(nullable = false)
     private boolean activo = true;
 
+    /** Sede a la que pertenece. Estudiantes, docentes y auxiliares tienen una; el Coordinador (general) no tiene: administra todas. */
+    @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "sede_id")
+    private Sede sede;
+
     protected Usuario() {}
 
     public Usuario(String nombre, String correo, String passwordHash, Rol rol, String documento,
@@ -60,4 +64,6 @@ public class Usuario {
     public void setPrograma(String programa) { this.programa = programa; }
     public boolean isActivo() { return activo; }
     public void setActivo(boolean activo) { this.activo = activo; }
+    public Sede getSede() { return sede; }
+    public void setSede(Sede sede) { this.sede = sede; }
 }

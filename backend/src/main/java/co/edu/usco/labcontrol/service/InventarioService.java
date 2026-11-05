@@ -18,9 +18,11 @@ public class InventarioService {
     private final UsuarioRepository usuarios;
     private final HistorialRepository historial;
     private final Mapper mapper;
+    private final SedeContexto sedes;
 
-    public InventarioService(EquipoRepository equipos, UsuarioRepository usuarios, HistorialRepository historial, Mapper mapper) {
-        this.equipos = equipos; this.usuarios = usuarios; this.historial = historial; this.mapper = mapper;
+    public InventarioService(EquipoRepository equipos, UsuarioRepository usuarios, HistorialRepository historial, Mapper mapper,
+                             SedeContexto sedes) {
+        this.equipos = equipos; this.usuarios = usuarios; this.historial = historial; this.mapper = mapper; this.sedes = sedes;
     }
 
     @Transactional
@@ -31,18 +33,21 @@ public class InventarioService {
         if (equipos.existsByPlaca(placa)) throw ApiException.conflict("Ya existe un equipo con la placa " + placa);
         EstadoEquipo estado = "MANTENIMIENTO".equalsIgnoreCase(r.estado()) ? EstadoEquipo.MANTENIMIENTO : EstadoEquipo.DISPONIBLE;
         Datos d = validar(r);
+        Sede sede = sedes.de(actor);
         Equipo e = new Equipo(placa, d.nombre, d.marca, d.modelo, d.serie, d.categoria, d.laboratorio, d.ubicacion,
                 d.descripcion, d.specs, d.accesorios, d.estadoFisico, d.foto, estado);
+        e.setSede(sede);
         equipos.save(e);
         historial.save(new HistorialEvento(mapper.ahora(), "ALTA", e, null, null, actor.getNombre(),
-                "Equipo registrado en el inventario (" + estado.name().toLowerCase() + ")"));
+                "Equipo registrado en el inventario de la " + sede.getNombre() + " (" + estado.name().toLowerCase() + ")"));
         return new EquipoAdminDto(mapper.equipo(e), true, null, null, null);
     }
 
     @Transactional
     public EquipoAdminDto actualizar(Long actorId, String placa, EquipoRequest r) {
         Usuario actor = usuarios.findById(actorId).orElseThrow();
-        Equipo e = equipos.findActivoForUpdate(placa).orElseThrow(() -> ApiException.notFound("El equipo no existe en el inventario activo"));
+        Equipo e = equipos.findActivoForUpdate(placa).filter(x -> sedes.pertenece(x, sedes.de(actor)))
+                .orElseThrow(() -> ApiException.notFound("El equipo no existe en el inventario activo"));
         Datos d = validar(r);
         e.actualizar(d.nombre, d.marca, d.modelo, d.serie, d.categoria, d.laboratorio, d.ubicacion, d.descripcion,
                 d.specs, d.accesorios, d.estadoFisico, d.foto);
@@ -54,7 +59,8 @@ public class InventarioService {
     @Transactional
     public EquipoDto cambiarEstado(Long actorId, String placa, EstadoEquipoRequest r) {
         Usuario actor = usuarios.findById(actorId).orElseThrow();
-        Equipo e = equipos.findActivoForUpdate(placa).orElseThrow(() -> ApiException.notFound("El equipo no existe en el inventario activo"));
+        Equipo e = equipos.findActivoForUpdate(placa).filter(x -> sedes.pertenece(x, sedes.de(actor)))
+                .orElseThrow(() -> ApiException.notFound("El equipo no existe en el inventario activo"));
         if (e.getEstado() == EstadoEquipo.PRESTADO) throw ApiException.conflict("No se puede cambiar el estado de un equipo que está prestado");
         EstadoEquipo nuevo;
         if ("MANTENIMIENTO".equalsIgnoreCase(r.estado())) nuevo = EstadoEquipo.MANTENIMIENTO;
@@ -85,8 +91,9 @@ public class InventarioService {
         String fisico = limpio(r.estadoFisico()) == null ? "Bueno" : limpio(r.estadoFisico());
         if (!ESTADOS_FISICOS.contains(fisico)) throw ApiException.badRequest("Estado físico no válido");
         String foto = limpio(r.fotoUrl());
-        if (foto != null && !(foto.startsWith("/images/") || foto.startsWith("https://") || foto.startsWith("http://"))) {
-            throw ApiException.badRequest("La fotografía debe ser una URL http(s) o una ruta /images/…");
+        if (foto != null && !(foto.startsWith("/images/") || foto.startsWith("https://") || foto.startsWith("http://")
+                || ImagenService.esRutaPropia(foto))) {
+            throw ApiException.badRequest("La fotografía debe ser una imagen subida, una URL http(s) o una ruta /images/…");
         }
         if (foto != null && foto.length() > 400) throw ApiException.badRequest("La URL de la fotografía es demasiado larga");
         return new Datos(nombre, limpio(r.marca()), limpio(r.modelo()), limpio(r.numeroSerie()), categoria, lab,

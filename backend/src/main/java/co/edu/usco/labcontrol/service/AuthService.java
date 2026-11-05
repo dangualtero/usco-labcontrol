@@ -57,8 +57,25 @@ public class AuthService {
             throw new ApiException(HttpStatus.UNAUTHORIZED, ERROR_GENERICO);
         }
         fallos.remove(correo);
+        verificarSede(u, r.sede());
         boolean recordar = Boolean.TRUE.equals(r.recordar());
         return new LoginResponse(jwt.generar(u, recordar), mapper.usuario(u), jwt.expiraEnSegundos(recordar));
+    }
+
+    /**
+     * Cada sede tiene su propia URL (/neiva/login, /pitalito/login…). Estudiantes, docentes y auxiliares solo ingresan por
+     * la de su sede; el Coordinador general ingresa por cualquiera. Se valida DESPUÉS de comprobar la contraseña, para
+     * no revelar a terceros a qué sede pertenece una cuenta.
+     */
+    private static void verificarSede(Usuario u, String slugUrl) {
+        if (u.getSede() == null) return;
+        if (!u.getSede().isActiva()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "La " + u.getSede().getNombre() + " está inactiva. Comunícate con la Coordinación de Laboratorios.");
+        }
+        if (slugUrl != null && !slugUrl.isBlank() && !u.getSede().getSlug().equalsIgnoreCase(slugUrl.trim())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Tu cuenta pertenece a la " + u.getSede().getNombre()
+                    + ". Ingresa desde la dirección /" + u.getSede().getSlug());
+        }
     }
 
     @Transactional(readOnly = true)

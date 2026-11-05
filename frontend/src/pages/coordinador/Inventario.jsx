@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Archive, CircleCheck, PackageX, Pencil, Plus, RefreshCw, Search, Trash2, Wrench } from 'lucide-react'
 import { api } from '../../api/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
+import { useSede } from '../../context/SedeContext.jsx'
 import { useDatos } from '../../lib/hooks.js'
 import { LABORATORIOS, norm } from '../../lib/constantes.js'
 import { fmtFechaHora } from '../../lib/fecha.js'
@@ -12,6 +13,7 @@ import EquipoFormModal from './EquipoFormModal.jsx'
 /** Inventario del coordinador: alta, edición, mantenimiento y baja lógica de equipos (PV-08, PV-09, PS-08). */
 export default function Inventario() {
   const toast = useToast()
+  const { sede } = useSede()
   const { datos, error, cargando, recargar } = useDatos(() => api.equiposAdmin(), [], { cada: 20000 })
   const [q, setQ] = useState('')
   const [lab, setLab] = useState('todos')
@@ -42,11 +44,11 @@ export default function Inventario() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-usco">Control de inventario</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-usco">Control de inventario · {sede?.nombre}</p>
           <h1 className="text-2xl font-extrabold sm:text-3xl">Gestión de equipos</h1>
           <p className="text-sm text-pizarra">Crea, edita y administra el estado de los equipos. Las bajas son lógicas: el registro del equipo se conserva para auditoría.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           <button onClick={recargar} disabled={cargando} className="btn-outline" aria-label="Actualizar inventario"><RefreshCw className={`h-4 w-4 ${cargando ? 'animate-spin' : ''}`} aria-hidden="true" /> Actualizar</button>
           <button onClick={() => setForm({ abierto: true, equipo: null })} className="btn-primary"><Plus className="h-4 w-4" aria-hidden="true" /> Nuevo equipo</button>
         </div>

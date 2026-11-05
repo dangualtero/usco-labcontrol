@@ -11,6 +11,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface EquipoRepository extends JpaRepository<Equipo, Long> {
     List<Equipo> findByActivoTrueOrderByLaboratorioAscPlacaAsc();
+    List<Equipo> findBySedeIdAndActivoTrueOrderByLaboratorioAscPlacaAsc(Long sedeId);
+    List<Equipo> findBySedeIdOrderByLaboratorioAscPlacaAsc(Long sedeId);
+    long countBySedeIdAndActivoTrue(Long sedeId);
+    List<Equipo> findBySedeIsNull();
     Optional<Equipo> findByPlacaAndActivoTrue(String placa);
     Optional<Equipo> findByPlaca(String placa);
     boolean existsByPlaca(String placa);

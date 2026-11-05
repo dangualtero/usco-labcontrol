@@ -20,6 +20,11 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+  # Fotografías subidas desde el computador o el celular (el frontend las reduce antes de enviarlas).
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
 
 labcontrol:
   jwt:

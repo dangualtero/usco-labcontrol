@@ -9,9 +9,12 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import org.springframework.format.annotation.DateTimeFormat;
+import java.time.Duration;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,7 +26,27 @@ public final class Controllers {
     @RequestMapping("/api")
     public static class PublicoController {
         private final AuthService auth;
-        public PublicoController(AuthService auth) { this.auth = auth; }
+        private final SedeService sedes;
+        private final ImagenService imagenes;
+        public PublicoController(AuthService auth, SedeService sedes, ImagenService imagenes) {
+            this.auth = auth; this.sedes = sedes; this.imagenes = imagenes;
+        }
+
+        /** Sedes (pública): la usa la pantalla «Elige tu sede» y la validación de /neiva, /pitalito… */
+        @GetMapping("/sedes")
+        public List<SedeDto> sedes() { return sedes.publicas(); }
+
+        /** Fotografía subida (pública para que la etiqueta img del catálogo la pueda mostrar). */
+        @GetMapping("/imagenes/{id}")
+        public ResponseEntity<byte[]> imagen(@PathVariable String id) {
+            return imagenes.buscar(id)
+                    .map(i -> ResponseEntity.ok()
+                            .contentType(MediaType.parseMediaType(i.getTipoContenido()))
+                            .cacheControl(CacheControl.maxAge(Duration.ofDays(30)).cachePublic().immutable())
+                            .header("X-Content-Type-Options", "nosniff")
+                            .body(i.getDatos()))
+                    .orElse(ResponseEntity.notFound().build());
+        }
 
         @PostMapping("/auth/login")
         public LoginResponse login(@Valid @RequestBody LoginRequest r) { return auth.login(r); }
@@ -49,14 +72,15 @@ public final class Controllers {
         public CatalogoController(CatalogoService catalogo) { this.catalogo = catalogo; }
 
         @GetMapping
-        public List<EquipoDto> listar(@RequestParam(required = false) String laboratorio,
+        public List<EquipoDto> listar(@AuthenticationPrincipal AuthUser u,
+                                      @RequestParam(required = false) String laboratorio,
                                       @RequestParam(required = false) String categoria,
                                       @RequestParam(required = false) String q) {
-            return catalogo.listar(laboratorio, categoria, q);
+            return catalogo.listar(u.id(), laboratorio, categoria, q);
         }
 
         @GetMapping("/{placa}")
-        public EquipoDetalleDto detalle(@PathVariable String placa) { return catalogo.detalle(placa); }
+        public EquipoDetalleDto detalle(@AuthenticationPrincipal AuthUser u, @PathVariable String placa) { return catalogo.detalle(u.id(), placa); }
     }
 
     @RestController
@@ -89,10 +113,12 @@ public final class Controllers {
         }
 
         @GetMapping("/panel")
-        public PanelDto panel() { return servicio.panel(); }
+        public PanelDto panel(@AuthenticationPrincipal AuthUser u) { return servicio.panel(u.id()); }
 
         @GetMapping("/usuarios/{documento}/solicitudes")
-        public SolicitudesUsuarioDto solicitudes(@PathVariable String documento) { return servicio.solicitudes(documento); }
+        public SolicitudesUsuarioDto solicitudes(@AuthenticationPrincipal AuthUser u, @PathVariable String documento) {
+            return servicio.solicitudes(u.id(), documento);
+        }
 
         @PostMapping("/salida")
         public PrestamoDto salida(@AuthenticationPrincipal AuthUser u, @RequestBody SalidaRequest r) {
@@ -135,24 +161,27 @@ public final class Controllers {
         }
 
         @GetMapping("/kpis")
-        public KpisDto kpis(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+        public KpisDto kpis(@AuthenticationPrincipal AuthUser u,
+                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
-            return servicio.kpis(desde, hasta);
+            return servicio.kpis(u.id(), desde, hasta);
         }
 
         @GetMapping("/historial")
-        public List<HistorialDto> historial(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+        public List<HistorialDto> historial(@AuthenticationPrincipal AuthUser u,
+                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
                                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
                                             @RequestParam(required = false) String laboratorio,
                                             @RequestParam(required = false) String q) {
-            return servicio.historial(desde, hasta, laboratorio, q);
+            return servicio.historial(u.id(), desde, hasta, laboratorio, q);
         }
 
         @GetMapping(value = "/reporte.csv", produces = "text/csv;charset=UTF-8")
-        public ResponseEntity<byte[]> reporte(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+        public ResponseEntity<byte[]> reporte(@AuthenticationPrincipal AuthUser u,
+                                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
                                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
                                               @RequestParam(required = false) String laboratorio) {
-            byte[] body = servicio.reporteCsv(desde, hasta, laboratorio).getBytes(StandardCharsets.UTF_8);
+            byte[] body = servicio.reporteCsv(u.id(), desde, hasta, laboratorio).getBytes(StandardCharsets.UTF_8);
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"reporte-uso-labcontrol.csv\"")
                     .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
@@ -161,7 +190,7 @@ public final class Controllers {
 
         // ---- Inventario (CRUD de equipos)
         @GetMapping("/equipos")
-        public List<EquipoAdminDto> equipos() { return servicio.equiposAdmin(); }
+        public List<EquipoAdminDto> equipos(@AuthenticationPrincipal AuthUser u) { return servicio.equiposAdmin(u.id()); }
 
         @PostMapping("/equipos")
         public EquipoAdminDto crear(@AuthenticationPrincipal AuthUser u, @RequestBody EquipoRequest r) { return inventario.crear(u.id(), r); }
@@ -183,10 +212,10 @@ public final class Controllers {
 
         // ---- Usuarios
         @GetMapping("/usuarios")
-        public List<UsuarioAdminDto> usuarios() { return usuarios.listar(); }
+        public List<UsuarioAdminDto> usuarios(@AuthenticationPrincipal AuthUser u) { return usuarios.listar(u.id()); }
 
         @PostMapping("/usuarios")
-        public UsuarioAdminDto crearUsuario(@RequestBody UsuarioRequest r) { return usuarios.crear(r); }
+        public UsuarioAdminDto crearUsuario(@AuthenticationPrincipal AuthUser u, @RequestBody UsuarioRequest r) { return usuarios.crear(u.id(), r); }
 
         @PutMapping("/usuarios/{id}/activo")
         public UsuarioAdminDto activo(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody ActivoRequest r) {
@@ -197,6 +226,66 @@ public final class Controllers {
         public Map<String, String> clave(@PathVariable Long id, @RequestBody ClaveRequest r) {
             usuarios.restablecerClave(id, r.nueva());
             return Map.of("mensaje", "Contraseña restablecida");
+        }
+    }
+
+    /** Sedes (solo Coordinador general). */
+    @RestController
+    @RequestMapping("/api/coordinador/sedes")
+    public static class SedesController {
+        private final SedeService sedes;
+        public SedesController(SedeService sedes) { this.sedes = sedes; }
+
+        @GetMapping
+        public List<SedeAdminDto> listar() { return sedes.listarAdmin(); }
+
+        @PostMapping
+        public SedeAdminDto crear(@RequestBody SedeRequest r) { return sedes.crear(r); }
+
+        @PutMapping("/{slug}")
+        public SedeAdminDto actualizar(@PathVariable String slug, @RequestBody SedeRequest r) { return sedes.actualizar(slug, r); }
+
+        @PutMapping("/{slug}/activa")
+        public SedeAdminDto activa(@PathVariable String slug, @RequestBody ActivoRequest r) { return sedes.activar(slug, r.activo()); }
+    }
+
+    /** Presupuesto por sede (solo Coordinador general). La sede llega en la cabecera X-Sede. */
+    @RestController
+    @RequestMapping("/api/coordinador/presupuesto")
+    public static class PresupuestoController {
+        private final PresupuestoService presupuesto;
+        public PresupuestoController(PresupuestoService presupuesto) { this.presupuesto = presupuesto; }
+
+        @GetMapping
+        public PresupuestoDto sede(@AuthenticationPrincipal AuthUser u) { return presupuesto.deSede(u.id()); }
+
+        @GetMapping("/resumen")
+        public ResumenPresupuestoDto resumen() { return presupuesto.resumen(); }
+
+        @GetMapping("/categorias")
+        public List<String> categorias() { return PresupuestoService.CATEGORIAS; }
+
+        @PostMapping("/movimientos")
+        public MovimientoDto registrar(@AuthenticationPrincipal AuthUser u, @RequestBody MovimientoRequest r) {
+            return presupuesto.registrar(u.id(), r);
+        }
+
+        @PostMapping("/movimientos/{id}/anular")
+        public MovimientoDto anular(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody AnularRequest r) {
+            return presupuesto.anular(u.id(), id, r.motivo());
+        }
+    }
+
+    /** Subida de fotografías desde el computador o el celular (solo Coordinador). */
+    @RestController
+    @RequestMapping("/api/coordinador/imagenes")
+    public static class ImagenesController {
+        private final ImagenService imagenes;
+        public ImagenesController(ImagenService imagenes) { this.imagenes = imagenes; }
+
+        @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        public ImagenSubidaDto subir(@AuthenticationPrincipal AuthUser u, @RequestParam("archivo") MultipartFile archivo) {
+            return imagenes.subir(u.id(), archivo);
         }
     }
 }

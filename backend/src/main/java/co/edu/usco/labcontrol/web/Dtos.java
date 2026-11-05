@@ -1,6 +1,7 @@
 package co.edu.usco.labcontrol.web;
 
 import jakarta.validation.constraints.NotBlank;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -9,9 +10,13 @@ public final class Dtos {
     private Dtos() {}
 
     // ---- Autenticación ----
-    public record LoginRequest(@NotBlank String email, @NotBlank String password, Boolean recordar) {}
+    /** sede: slug de la URL desde la que se ingresa (/neiva/login → «neiva»). Opcional. */
+    public record LoginRequest(@NotBlank String email, @NotBlank String password, Boolean recordar, String sede) {
+        public LoginRequest(String email, String password, Boolean recordar) { this(email, password, recordar, null); }
+    }
+    /** sede/sedeNombre: null para el Coordinador general (administra todas las sedes). */
     public record UsuarioDto(Long id, String nombre, String correo, String rol, String grupo, String documento,
-                             String programa, String codigoEstudiantil) {}
+                             String programa, String codigoEstudiantil, String sede, String sedeNombre) {}
     public record LoginResponse(String token, UsuarioDto usuario, long expiraEnSegundos) {}
     public record CambiarClaveRequest(String actual, String nueva) {}
 
@@ -69,9 +74,32 @@ public final class Dtos {
                                 List<String> specs, List<String> accesorios, String estadoFisico, String fotoUrl,
                                 String estado) {}
     public record UsuarioAdminDto(Long id, String nombre, String correo, String rol, String documento,
-                                  String codigoEstudiantil, String programa, boolean activo) {}
+                                  String codigoEstudiantil, String programa, boolean activo, String sede, String sedeNombre) {}
     public record UsuarioRequest(String nombre, String correo, String rol, String documento,
                                  String codigoEstudiantil, String programa, String password) {}
     public record ActivoRequest(boolean activo) {}
     public record ClaveRequest(String nueva) {}
+
+    // ---- Sedes ----
+    public record SedeDto(Long id, String slug, String nombre, String ciudad, String direccion, boolean activa) {}
+    /** Tarjeta de la sede en la vista de administración: con conteos y saldo del presupuesto. */
+    public record SedeAdminDto(SedeDto sede, long equipos, long usuarios, long saldo) {}
+    public record SedeRequest(String nombre, String ciudad, String direccion) {}
+
+    // ---- Presupuesto (por sede) ----
+    public record MovimientoDto(Long id, String tipo, String concepto, String categoria, long monto, LocalDate fecha,
+                                String placa, String registradoPor, LocalDateTime registradoEn, boolean anulado,
+                                String anulacionMotivo, String anuladoPor, LocalDateTime anuladoEn) {}
+    public record CategoriaTotalDto(String categoria, long total) {}
+    public record PresupuestoDto(SedeDto sede, long ingresos, long gastos, long saldo,
+                                 List<CategoriaTotalDto> gastosPorCategoria, List<MovimientoDto> movimientos) {}
+    public record PresupuestoSedeDto(SedeDto sede, long ingresos, long gastos, long saldo, long movimientos) {}
+    public record ResumenPresupuestoDto(List<PresupuestoSedeDto> sedes, long ingresos, long gastos, long saldo) {}
+    /** tipo: INGRESO (suma) o GASTO (resta). monto en pesos colombianos, sin decimales. */
+    public record MovimientoRequest(String tipo, String concepto, String categoria, Long monto, LocalDate fecha, String placa) {}
+    public record AnularRequest(String motivo) {}
+
+    // ---- Imágenes ----
+    /** url: ruta lista para guardar en fotoUrl (ej. /api/imagenes/3f9c…). */
+    public record ImagenSubidaDto(String id, String url, long tamano, String tipo) {}
 }

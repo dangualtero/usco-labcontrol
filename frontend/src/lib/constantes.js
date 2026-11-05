@@ -9,7 +9,17 @@ export const GRUPOS = {
   COORDINADOR: { etiqueta: 'Coordinador de laboratorios', home: '/coordinador' },
 }
 
-export const homeDe = (grupo) => GRUPOS[grupo]?.home ?? '/login'
+/** Ruta de inicio del rol dentro de una sede: homeDe('AUXILIAR', 'pitalito') → '/pitalito/auxiliar'. */
+export const homeDe = (grupo, sede) => (sede ? `/${sede}` : '') + (GRUPOS[grupo]?.home ?? '/login')
+
+/** Categorías del presupuesto (las mismas que valida el servidor). */
+export const CATEGORIAS_PRESUPUESTO = ['Asignación', 'Compra de equipos', 'Mantenimiento', 'Calibración', 'Insumos y repuestos', 'Otro']
+
+const COP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
+export const pesos = (v) => COP.format(v ?? 0)
+
+/** «La Plata» → «la-plata» (igual que el servidor). */
+export const slugDe = (t) => norm(t).replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
 /** Franjas de reserva (PF-06): 2 horas cada una. */
 export const FRANJAS = [

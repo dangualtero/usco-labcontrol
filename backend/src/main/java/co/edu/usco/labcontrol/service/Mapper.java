@@ -23,12 +23,12 @@ public class Mapper {
 
     public UsuarioDto usuario(Usuario u) {
         return new UsuarioDto(u.getId(), u.getNombre(), u.getCorreo(), u.getRol().name(), u.getRol().grupo(),
-                u.getDocumento(), u.getPrograma(), u.getCodigoEstudiantil());
+                u.getDocumento(), u.getPrograma(), u.getCodigoEstudiantil(), slug(u.getSede()), nombreSede(u.getSede()));
     }
 
     public UsuarioAdminDto usuarioAdmin(Usuario u) {
         return new UsuarioAdminDto(u.getId(), u.getNombre(), u.getCorreo(), u.getRol().name(), u.getDocumento(),
-                u.getCodigoEstudiantil(), u.getPrograma(), u.isActivo());
+                u.getCodigoEstudiantil(), u.getPrograma(), u.isActivo(), slug(u.getSede()), nombreSede(u.getSede()));
     }
 
     public EquipoDto equipo(Equipo e) {
@@ -52,5 +52,17 @@ public class Mapper {
                 h.getLaboratorio(), h.getPrestamoCodigo(), h.getUsuarioNombre(), h.getAuxiliarNombre(), h.getDetalle());
     }
 
+    public SedeDto sede(Sede s) {
+        return new SedeDto(s.getId(), s.getSlug(), s.getNombre(), s.getCiudad(), s.getDireccion(), s.isActiva());
+    }
+
+    public MovimientoDto movimiento(MovimientoPresupuesto m) {
+        return new MovimientoDto(m.getId(), m.getTipo().name(), m.getConcepto(), m.getCategoria(), m.getMonto(), m.getFecha(),
+                m.getPlaca(), m.getRegistradoPor(), m.getRegistradoEn(), m.isAnulado(), m.getAnulacionMotivo(),
+                m.getAnuladoPor(), m.getAnuladoEn());
+    }
+
     private static String nombre(Usuario u) { return u == null ? null : u.getNombre(); }
+    private static String slug(Sede s) { return s == null ? null : s.getSlug(); }
+    private static String nombreSede(Sede s) { return s == null ? null : s.getNombre(); }
 }

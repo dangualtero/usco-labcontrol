@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRightLeft, CircleCheck, LogOut, PackageOpen } from 'lucide-react'
 import { api } from '../../api/index.js'
+import { useSede } from '../../context/SedeContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAhora, useDatos } from '../../lib/hooks.js'
@@ -10,6 +11,7 @@ import { Campo, Cargando, Confirmar, ErrorCaja, PrestamoBadge, Vacio } from '../
 
 /** Cierre de Turno (PF-12): resumen de equipos pendientes y transferencia de custodia. */
 export default function CierreTurno() {
+  const { ruta } = useSede()
   const { cerrar } = useAuth()
   const toast = useToast()
   const ahora = useAhora(30000)
@@ -71,7 +73,7 @@ export default function CierreTurno() {
             </Campo>
             <ErrorCaja mensaje={err} />
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <Link to="/auxiliar" className="btn-outline">Volver a ventanilla</Link>
+              <Link to={ruta('/auxiliar')} className="btn-outline">Volver a ventanilla</Link>
               <button className="btn-primary" disabled={!destino} onClick={() => setConfirmar(true)}><ArrowRightLeft className="h-4 w-4" aria-hidden="true" /> {n ? 'Transferir custodia y cerrar turno' : 'Cerrar turno'}</button>
             </div>
           </section>
@@ -81,7 +83,7 @@ export default function CierreTurno() {
       {resultado && (
         <Vacio icono={CircleCheck} titulo={`Turno cerrado · ${resultado.transferidos} ${resultado.transferidos === 1 ? 'equipo transferido' : 'equipos transferidos'}`} detalle={`La custodia quedó a cargo de ${resultado.destino}. El movimiento quedó registrado en el historial inmutable.`}>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Link to="/auxiliar" className="btn-outline">Volver a ventanilla</Link>
+            <Link to={ruta('/auxiliar')} className="btn-outline">Volver a ventanilla</Link>
             <button className="btn-primary" onClick={() => cerrar('manual')}><LogOut className="h-4 w-4" aria-hidden="true" /> Cerrar sesión</button>
           </div>
         </Vacio>

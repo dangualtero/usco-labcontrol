@@ -13,10 +13,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Carga inicial en MySQL (solo si la tabla de usuarios está vacía): cuentas reales con contraseña cifrada con BCrypt,
- * inventario de los 4 laboratorios y, opcionalmente, préstamos e historial de ejemplo para poblar los paneles.
+ * inventario de los 4 laboratorios (la sede la asigna después SedesIniciales) y, opcionalmente, préstamos e historial de ejemplo para poblar los paneles.
  * Las credenciales iniciales están documentadas en README.md; se pueden cambiar desde «Mi cuenta» o por el Coordinador.
  */
 @Component
+@org.springframework.core.annotation.Order(0)
 public class DataInitializer implements CommandLineRunner {
     private final UsuarioRepository usuarios;
     private final EquipoRepository equipos;

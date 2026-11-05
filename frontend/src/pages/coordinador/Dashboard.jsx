@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Boxes, CircleCheck, Clock, Download, FileBarChart2, ShieldCheck, TimerReset, TriangleAlert, Wrench, ArrowRightLeft, BadgeCheck } from 'lucide-react'
 import { api } from '../../api/index.js'
+import { useSede } from '../../context/SedeContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useTema } from '../../context/TemaContext.jsx'
 import { useDatos } from '../../lib/hooks.js'
@@ -14,6 +15,7 @@ const hoy = () => new Date()
 const haceDias = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d }
 
 export default function Dashboard() {
+  const { ruta } = useSede()
   const toast = useToast()
   const { oscuro } = useTema()
   const g = oscuro
@@ -70,7 +72,7 @@ export default function Dashboard() {
           {k.vencidos > 0 && (
             <div role="alert" className="flex items-start gap-3 rounded-xl border border-alerta-borde bg-alerta-fondo p-4">
               <TriangleAlert className="mt-0.5 h-6 w-6 shrink-0 text-alerta-borde" aria-hidden="true" />
-              <p className="text-sm font-semibold text-alerta-texto"><strong className="font-extrabold">{k.vencidos} {k.vencidos === 1 ? 'préstamo vencido' : 'préstamos vencidos'}</strong> en este momento: la devolución superó el tiempo límite. Revisa el <Link to="/coordinador/historial" className="underline">historial</Link> para identificar al responsable.</p>
+              <p className="text-sm font-semibold text-alerta-texto"><strong className="font-extrabold">{k.vencidos} {k.vencidos === 1 ? 'préstamo vencido' : 'préstamos vencidos'}</strong> en este momento: la devolución superó el tiempo límite. Revisa el <Link to={ruta('/coordinador/historial')} className="underline">historial</Link> para identificar al responsable.</p>
             </div>
           )}
 

@@ -80,9 +80,34 @@ Opcional: `mysql -u root -p labcontrol < backend/db/inmutabilidad.sql` agrega tr
 
 - **Estudiante / Docente:** catálogo con fotografías y filtros instantáneos, **ficha técnica completa** (foto, marca, modelo, serie, ubicación exacta, estado físico, accesorios, disponibilidad), solicitud de préstamo (fecha, franja, asignatura, docente), **Mis reservas** (cancelar pendientes, ver rechazos), **Mi historial**, alertas de devolución vencida y **Mi cuenta** (cambio de contraseña).
 - **Auxiliar:** ventanilla con búsqueda por código estudiantil o documento, **aprobar y registrar salida** (azul) o **rechazar** con motivo, **registrar entrada** (verde) con checklist de estado físico y advertencia disciplinaria, alertas de retraso, **inventario** (enviar a mantenimiento / reactivar) y **cierre de turno** con transferencia de custodia.
-- **Coordinador:** dashboard con KPIs y gráficos, **historial inmutable** con filtros y exportación CSV sanitizada, **CRUD de equipos** (crear, editar, mantenimiento, baja lógica) y **gestión de usuarios** (crear con rol, activar/desactivar, restablecer contraseña).
+- **Coordinador general:** sedes, presupuesto por sede, dashboard con KPIs y gráficos, **historial inmutable** con filtros y exportación CSV sanitizada, **CRUD de equipos** (crear, editar, mantenimiento, baja lógica) y **gestión de usuarios** (crear con rol, activar/desactivar, restablecer contraseña).
 - **Seguridad:** login único por correo `@usco.edu.co` y contraseña, JWT, BCrypt, autorización por rol en el servidor (`SecurityConfig`) y en el cliente (`RequiereRol`), bloqueo temporal tras 5 intentos fallidos, mensajes de error genéricos, el rol y el estado de la cuenta se verifican en la base de datos en **cada** petición, cierre de sesión por inactividad (sin «Recordar mi sesión»).
 - **Concurrencia:** bloqueo pesimista sobre el equipo (`SELECT … FOR UPDATE`): cero préstamos duplicados.
+
+## Sedes, presupuesto y fotografías (v1.2)
+
+### Una dirección por sede
+| Dirección | Qué muestra |
+|---|---|
+| `http://localhost:5173/` | «Elige tu sede» (solo sedes activas) |
+| `http://localhost:5173/neiva/login` | Ingreso a la Sede Neiva |
+| `http://localhost:5173/pitalito/login` | Ingreso a la Sede Pitalito (cuando el coordinador la cree) |
+| `http://localhost:5173/garzon/coordinador/presupuesto` | Presupuesto de la Sede Garzón |
+
+- Cada estudiante, docente y auxiliar **pertenece a una sede**: solo ve el inventario, los préstamos y el historial de esa sede. Si intenta ingresar por la dirección de otra, el sistema le dice a qué sede pertenece.
+- El **Coordinador general** (rol COORDINADOR) administra todas las sedes y cambia entre ellas con el selector del encabezado; las pantallas conservan la sección (Inventario, Usuarios, Presupuesto…).
+- El frontend envía la sede en la cabecera `X-Sede`; el servidor solo la respeta para el coordinador. A los demás siempre les aplica su propia sede.
+- **Migración automática:** al arrancar la API con esta versión se crea la *Sede Neiva* y se le asignan todos los equipos y usuarios existentes. No hay que ejecutar SQL: `ddl-auto: update` agrega las columnas `sede_id` y las tablas `sedes`, `presupuesto_movimientos` e `imagenes`.
+
+### Coordinador → Sedes
+Crear sede (ciudad → dirección web, p. ej. «La Plata» → `/la-plata`), editar nombre y dirección física, activar/desactivar (desactivar no borra datos; impide el ingreso de sus usuarios). Los usuarios nuevos se crean en la sede que está abierta.
+
+### Coordinador → Presupuesto
+Un presupuesto por sede. **Ingreso** suma y **Gasto** resta; no se permite un gasto mayor al saldo. Cada movimiento lleva concepto, categoría, valor en COP, fecha (no futura) y placa opcional del equipo. Los movimientos **no se borran**: se anulan con motivo y quedan visibles tachados. Incluye gastos por categoría y el saldo de todas las sedes.
+
+### Fotografía desde el computador o el celular
+En **Inventario → Nuevo / Editar equipo**, «Subir fotografía» abre el explorador de archivos (en el celular: galería o cámara). También se puede arrastrar la imagen. Antes de subirla el navegador la reduce a 1600 px en JPEG, así una foto de celular pesa unos cientos de KB.
+El servidor acepta JPG, PNG o WEBP de hasta 5 MB, verifica el tipo real del archivo y la guarda en MySQL (tabla `imagenes`); se sirve en `/api/imagenes/{id}`. La opción «O usar una URL» sigue disponible.
 
 ## Fotografías de los equipos
 

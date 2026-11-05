@@ -18,15 +18,18 @@ public class CatalogoService {
     private final EquipoRepository equipos;
     private final PrestamoRepository prestamos;
     private final Mapper mapper;
+    private final SedeContexto sedes;
 
-    public CatalogoService(EquipoRepository equipos, PrestamoRepository prestamos, Mapper mapper) {
-        this.equipos = equipos; this.prestamos = prestamos; this.mapper = mapper;
+    public CatalogoService(EquipoRepository equipos, PrestamoRepository prestamos, Mapper mapper, SedeContexto sedes) {
+        this.equipos = equipos; this.prestamos = prestamos; this.mapper = mapper; this.sedes = sedes;
     }
 
+    /** Catálogo de la sede del usuario (el Coordinador ve el de la sede que tenga seleccionada). */
     @Transactional(readOnly = true)
-    public List<EquipoDto> listar(String laboratorio, String categoria, String q) {
+    public List<EquipoDto> listar(Long usuarioId, String laboratorio, String categoria, String q) {
         String nq = normalizar(q);
-        return equipos.findByActivoTrueOrderByLaboratorioAscPlacaAsc().stream()
+        var sede = sedes.de(usuarioId);
+        return equipos.findBySedeIdAndActivoTrueOrderByLaboratorioAscPlacaAsc(sede.getId()).stream()
                 .filter(e -> vacio(laboratorio) || e.getLaboratorio().equalsIgnoreCase(laboratorio))
                 .filter(e -> vacio(categoria) || e.getCategoria().equalsIgnoreCase(categoria))
                 .filter(e -> nq.isEmpty() || normalizar(e.getPlaca() + " " + e.getNombre() + " " + e.getMarca() + " "
@@ -36,8 +39,9 @@ public class CatalogoService {
 
     /** Ficha técnica + historial PÚBLICO anonimizado: solo ID anónimo y fechas, sin datos del usuario (PS-05). */
     @Transactional(readOnly = true)
-    public EquipoDetalleDto detalle(String placa) {
-        var e = equipos.findByPlacaAndActivoTrue(placa)
+    public EquipoDetalleDto detalle(Long usuarioId, String placa) {
+        var sede = sedes.de(usuarioId);
+        var e = equipos.findByPlacaAndActivoTrue(placa).filter(x -> sedes.pertenece(x, sede))
                 .orElseThrow(() -> ApiException.notFound("El equipo no existe en el inventario activo"));
         List<Prestamo> usos = prestamos.findByEquipoPlacaAndEstadoInOrderByFechaSolicitudDesc(placa,
                 Set.of(EstadoPrestamo.ACTIVO, EstadoPrestamo.DEVUELTO));

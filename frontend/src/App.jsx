@@ -2,8 +2,10 @@ import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { LockKeyhole, Loader2 } from 'lucide-react'
 import { useAuth } from './context/AuthContext.jsx'
+import { SedeLayout, useSede } from './context/SedeContext.jsx'
 import Shell from './components/Shell.jsx'
 import Login from './pages/Login.jsx'
+import ElegirSede from './pages/ElegirSede.jsx'
 import Catalogo from './pages/usuario/Catalogo.jsx'
 import MisReservas from './pages/usuario/MisReservas.jsx'
 import MiHistorial from './pages/usuario/MiHistorial.jsx'
@@ -13,6 +15,8 @@ import Dashboard from './pages/coordinador/Dashboard.jsx'
 import HistorialInmutable from './pages/coordinador/HistorialInmutable.jsx'
 import Inventario from './pages/coordinador/Inventario.jsx'
 import Usuarios from './pages/coordinador/Usuarios.jsx'
+import Presupuesto from './pages/coordinador/Presupuesto.jsx'
+import Sedes from './pages/coordinador/Sedes.jsx'
 import InventarioAux from './pages/auxiliar/InventarioAux.jsx'
 import ConexionBanner from './components/ConexionBanner.jsx'
 
@@ -22,8 +26,14 @@ const REQUERIDO = {
   COORDINADOR: 'Disponible únicamente para Coordinador',
 }
 
+/**
+ * Exige sesión dentro de /:sede. Un estudiante, docente o auxiliar solo puede estar en la URL de SU sede: si abre la de
+ * otra (por ejemplo /pitalito siendo de Neiva) se le lleva a la misma pantalla en su sede. El Coordinador general
+ * puede navegar por todas.
+ */
 function RequiereSesion() {
   const { usuario, validando } = useAuth()
+  const { slug, ruta } = useSede()
   const loc = useLocation()
   if (validando) {
     return (
@@ -33,13 +43,17 @@ function RequiereSesion() {
       </div>
     )
   }
-  if (!usuario) return <Navigate to="/login" replace state={{ desde: loc.pathname }} />
+  if (!usuario) return <Navigate to={ruta('/login')} replace state={{ desde: loc.pathname }} />
+  if (usuario.sede && usuario.sede !== slug) {
+    return <Navigate to={`/${usuario.sede}${loc.pathname.replace(/^\/[^/]+/, '')}`} replace />
+  }
   return <Shell />
 }
 
 /** RBAC en el cliente (PS-02, PS-03). El servidor aplica la misma regla con Spring Security (RNF-03). */
 function RequiereRol({ grupo }) {
-  const { usuario, home } = useAuth()
+  const { usuario } = useAuth()
+  const { inicio } = useSede()
   if (usuario.grupo === grupo) return <Outlet />
   return (
     <div className="card mx-auto mt-8 max-w-lg p-8 text-center aparecer" role="alert">
@@ -47,41 +61,57 @@ function RequiereRol({ grupo }) {
       <h1 className="text-xl font-extrabold">Acceso restringido</h1>
       <p className="mt-2 font-semibold text-slate-700">{REQUERIDO[grupo]}</p>
       <p className="mt-1 text-sm text-pizarra">Su rol actual no tiene permiso para ver esta sección.</p>
-      <Link to={home} className="btn-primary mt-6">Volver a mi panel principal</Link>
+      <Link to={inicio(usuario.grupo)} className="btn-primary mt-6">Volver a mi panel principal</Link>
     </div>
   )
 }
 
-function Raiz() {
+/** /:sede sin más ruta → panel del rol o ingreso de esa sede. */
+function RaizSede() {
+  const { usuario } = useAuth()
+  const { ruta, inicio } = useSede()
+  return <Navigate to={usuario ? inicio(usuario.grupo) : ruta('/login')} replace />
+}
+
+/** /login (dirección antigua) → ingreso de la sede del usuario, o «Elige tu sede». */
+function LoginSinSede() {
   const { usuario, home } = useAuth()
-  return <Navigate to={usuario ? home : '/login'} replace />
+  return <Navigate to={usuario ? home : '/'} replace />
 }
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/" element={<Raiz />} />
-      <Route element={<RequiereSesion />}>
-        <Route element={<RequiereRol grupo="USUARIO" />}>
-          <Route path="/usuario" element={<Navigate to="/usuario/catalogo" replace />} />
-          <Route path="/usuario/catalogo" element={<Catalogo />} />
-          <Route path="/usuario/reservas" element={<MisReservas />} />
-          <Route path="/usuario/historial" element={<MiHistorial />} />
+      <Route path="/" element={<ElegirSede />} />
+      <Route path="/login" element={<LoginSinSede />} />
+      {/* Cada sede tiene su propia dirección: /neiva, /pitalito, /garzon… */}
+      <Route path="/:sede" element={<SedeLayout />}>
+        <Route index element={<RaizSede />} />
+        <Route path="login" element={<Login />} />
+        <Route element={<RequiereSesion />}>
+          <Route element={<RequiereRol grupo="USUARIO" />}>
+            <Route path="usuario" element={<Navigate to="catalogo" replace />} />
+            <Route path="usuario/catalogo" element={<Catalogo />} />
+            <Route path="usuario/reservas" element={<MisReservas />} />
+            <Route path="usuario/historial" element={<MiHistorial />} />
+          </Route>
+          <Route element={<RequiereRol grupo="AUXILIAR" />}>
+            <Route path="auxiliar" element={<Ventanilla />} />
+            <Route path="auxiliar/turno" element={<CierreTurno />} />
+            <Route path="auxiliar/inventario" element={<InventarioAux />} />
+          </Route>
+          <Route element={<RequiereRol grupo="COORDINADOR" />}>
+            <Route path="coordinador" element={<Dashboard />} />
+            <Route path="coordinador/historial" element={<HistorialInmutable />} />
+            <Route path="coordinador/inventario" element={<Inventario />} />
+            <Route path="coordinador/usuarios" element={<Usuarios />} />
+            <Route path="coordinador/presupuesto" element={<Presupuesto />} />
+            <Route path="coordinador/sedes" element={<Sedes />} />
+          </Route>
         </Route>
-        <Route element={<RequiereRol grupo="AUXILIAR" />}>
-          <Route path="/auxiliar" element={<Ventanilla />} />
-          <Route path="/auxiliar/turno" element={<CierreTurno />} />
-          <Route path="/auxiliar/inventario" element={<InventarioAux />} />
-        </Route>
-        <Route element={<RequiereRol grupo="COORDINADOR" />}>
-          <Route path="/coordinador" element={<Dashboard />} />
-          <Route path="/coordinador/historial" element={<HistorialInmutable />} />
-          <Route path="/coordinador/inventario" element={<Inventario />} />
-          <Route path="/coordinador/usuarios" element={<Usuarios />} />
-        </Route>
+        <Route path="*" element={<RaizSede />} />
       </Route>
-      <Route path="*" element={<Raiz />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

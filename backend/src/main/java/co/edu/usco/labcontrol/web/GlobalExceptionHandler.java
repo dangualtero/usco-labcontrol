@@ -25,6 +25,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(Map.of("error", "Solicitud inválida: revise los campos obligatorios"));
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, String>> archivoGrande(Exception e) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(Map.of("error", "La fotografía supera los 5 MB permitidos"));
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MultipartException.class)
+    public ResponseEntity<Map<String, String>> multipart(Exception e) {
+        return ResponseEntity.badRequest().body(Map.of("error", "No se pudo recibir el archivo. Intenta de nuevo."));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> generico(Exception e) {
         log.error("Error no controlado", e);

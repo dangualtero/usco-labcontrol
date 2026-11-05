@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, LogIn, TriangleAlert, CircleCheck, Radar, History, BellRing, ArrowUp } from 'lucide-react'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Eye, EyeOff, LogIn, TriangleAlert, CircleCheck, Radar, History, BellRing, ArrowUp, MapPin, ArrowLeftRight } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useSede } from '../context/SedeContext.jsx'
 import { REGEX_CORREO, homeDe } from '../lib/constantes.js'
 import { Campo } from '../components/ui.jsx'
 import ConexionBanner from '../components/ConexionBanner.jsx'
@@ -15,6 +16,7 @@ const PUNTOS = [
 
 export default function Login() {
   const { usuario, iniciar } = useAuth()
+  const { sede, slug, ruta } = useSede()
   const nav = useNavigate()
   const loc = useLocation()
   const [correo, setCorreo] = useState('')
@@ -32,12 +34,13 @@ export default function Login() {
     if (c === 'manual') setAviso({ ok: true, t: 'Sesión cerrada correctamente', d: 'Tu sesión se cerró de forma segura. Vuelve pronto.' })
     if (c === 'inactividad') setAviso({ ok: false, t: 'Sesión cerrada por seguridad', d: 'Se detectó inactividad prolongada.' })
     if (c === 'expirada') setAviso({ ok: false, t: 'Tu sesión expiró', d: 'Inicia sesión nuevamente para continuar.' })
-    if (c) nav('/login', { replace: true, state: null })
+    if (c) nav(ruta('/login'), { replace: true, state: null })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Redirección automática según el rol que devuelve la base de datos
-  if (usuario) return <Navigate to={homeDe(usuario.grupo)} replace />
+  // Estudiantes y auxiliares van a SU sede; el Coordinador general entra a la sede de la URL.
+  if (usuario) return <Navigate to={homeDe(usuario.grupo, usuario.sede ?? slug)} replace />
 
   const validar = () => {
     const e = {}
@@ -56,7 +59,7 @@ export default function Login() {
     setCargando(true)
     try {
       const u = await iniciar({ email: correo.trim(), password: clave, recordar })
-      nav(homeDe(u.grupo), { replace: true })
+      nav(homeDe(u.grupo, u.sede ?? slug), { replace: true })
     } catch (e) {
       // 401: «Credenciales inválidas» genérico (PS-08). Status 0: la API no responde (mensaje real de conexión).
       setErrorGlobal(e.message)
@@ -76,7 +79,7 @@ export default function Login() {
           <div className="mt-2 h-1 w-24 rounded bg-oro-claro" />
         </div>
         <div className="relative max-w-xl">
-          <p className="mb-3 inline-block rounded-full border border-oro-claro/50 px-3 py-1 text-xs font-bold uppercase tracking-widest text-oro-claro">Facultad de Ingeniería · Sede Neiva</p>
+          <p className="mb-3 inline-block rounded-full border border-oro-claro/50 px-3 py-1 text-xs font-bold uppercase tracking-widest text-oro-claro">Facultad de Ingeniería · {sede?.nombre ?? 'Sede Neiva'}</p>
           <h1 className="font-titulo text-5xl font-extrabold leading-[1.05] tracking-tight text-white xl:text-6xl">USCO <span className="text-oro-claro">LabControl</span></h1>
           <p className="mt-4 text-lg text-white/90">Gestión y trazabilidad de préstamos de equipos en los laboratorios de Electrónica, Petróleos, Civil y Agrícola.</p>
           <ul className="mt-9 space-y-4">
@@ -99,6 +102,10 @@ export default function Login() {
         <div className="flex justify-end px-5 pt-4 sm:px-10"><BotonTema variante="claro" conTexto /></div>
         <div className="flex flex-1 items-center justify-center px-5 pb-8 pt-2 sm:px-10">
           <div className="w-full max-w-[440px]">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-usco-soft px-3 py-1 text-xs font-bold text-usco-darker ring-1 ring-usco/20"><MapPin className="h-3.5 w-3.5" aria-hidden="true" /> {sede?.nombre}</span>
+              <Link to="/" className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs font-semibold text-pizarra hover:text-usco hover:underline"><ArrowLeftRight className="h-3.5 w-3.5" aria-hidden="true" /> Cambiar de sede</Link>
+            </div>
             <p className="text-sm font-bold uppercase tracking-widest text-usco">Ingreso institucional</p>
             <h2 className="mt-1 text-3xl font-extrabold">Bienvenido a LabControl</h2>
             <p className="mt-1.5 text-sm text-pizarra">Ingresa con tu correo institucional <strong>@usco.edu.co</strong> y contraseña.</p>

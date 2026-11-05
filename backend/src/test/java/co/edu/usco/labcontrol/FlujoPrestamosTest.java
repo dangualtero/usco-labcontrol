@@ -62,16 +62,17 @@ class FlujoPrestamosTest {
 
     @Test
     void catalogoNoExponeQuienTieneElEquipoYMuestraLaFichaCompleta() {
-        EquipoDetalleDto d = catalogo.detalle("USCO-EQ-103");
+        Long est = id("estudiante@usco.edu.co");
+        EquipoDetalleDto d = catalogo.detalle(est, "USCO-EQ-103");
         assertThat(d.equipo().estado()).isEqualTo("DISPONIBLE");
         assertThat(d.equipo().fotoUrl()).isEqualTo("/images/equipos/usco-eq-103.jpg");
         assertThat(d.equipo().numeroSerie()).isNotBlank();
         assertThat(d.equipo().ubicacion()).contains("Electrónica");
         assertThat(d.equipo().accesorios()).isNotEmpty();
         assertThat(d.historialPublico()).allSatisfy(u -> assertThat(u.idAnonimo()).startsWith("PR-"));
-        assertThat(catalogo.listar(null, null, "multimetro")).extracting(EquipoDto::placa).contains("USCO-EQ-103");
-        assertThat(catalogo.listar(null, null, "Telescopio")).isEmpty();
-        assertThat(catalogo.listar(null, null, null)).hasSize(18);
+        assertThat(catalogo.listar(est, null, null, "multimetro")).extracting(EquipoDto::placa).contains("USCO-EQ-103");
+        assertThat(catalogo.listar(est, null, null, "Telescopio")).isEmpty();
+        assertThat(catalogo.listar(est, null, null, null)).hasSize(18);
     }
 
     @Test
@@ -102,13 +103,13 @@ class FlujoPrestamosTest {
     @Test
     void reservaYSalidaConvierteLaReservaSinDuplicar() {
         Long aux = id("auxiliar@usco.edu.co");
-        SolicitudesUsuarioDto s = prestamos.solicitudes("1075123456");
+        SolicitudesUsuarioDto s = prestamos.solicitudes(aux, "1075123456");
         assertThat(s.reservas()).extracting(PrestamoDto::placa).contains("USCO-EQ-100");
         assertThat(s.codigoEstudiantil()).isEqualTo("20211100456");
         PrestamoDto salida = prestamos.salida(aux, new SalidaRequest("USCO-EQ-100", "1075123456", 2));
         assertThat(salida.codigo()).startsWith("RES-");
         assertThat(salida.estado()).isEqualTo("ACTIVO");
-        assertThat(prestamos.solicitudes("1075123456").reservas()).isEmpty();
+        assertThat(prestamos.solicitudes(aux, "1075123456").reservas()).isEmpty();
     }
 
     @Test
@@ -179,7 +180,7 @@ class FlujoPrestamosTest {
         EquipoAdminDto creado = inventario.crear(coord, nuevo);
         assertThat(creado.equipo().accesorios()).containsExactly("Estuche", "Baterías");
         assertThatThrownBy(() -> inventario.crear(coord, nuevo)).hasMessageContaining("Ya existe");
-        assertThat(catalogo.listar(null, null, "clorofila")).hasSize(1);
+        assertThat(catalogo.listar(coord, null, null, "clorofila")).hasSize(1);
 
         assertThat(inventario.actualizar(coord, "USCO-EQ-410", new EquipoRequest(null, "Medidor de Clorofila SPAD", "Konica Minolta", "SPAD-502", "SPAD-12345",
                 "Análisis de cultivos", "Agrícola", "Sede Neiva · Bodega 2", null, null, List.of("Estuche"), "Bueno", null, null)).equipo().nombre()).isEqualTo("Medidor de Clorofila SPAD");
@@ -191,9 +192,9 @@ class FlujoPrestamosTest {
 
         assertThatThrownBy(() -> coordinador.baja(coord, "USCO-EQ-300", "Daño total")).hasMessageContaining("prestado");
         coordinador.baja(coord, "USCO-EQ-403", "Pantalla irreparable y batería inservible");
-        assertThat(catalogo.listar(null, null, null)).extracting(EquipoDto::placa).doesNotContain("USCO-EQ-403");
+        assertThat(catalogo.listar(coord, null, null, null)).extracting(EquipoDto::placa).doesNotContain("USCO-EQ-403");
         assertThat(equipos.findByPlaca("USCO-EQ-403")).isPresent();
-        assertThat(coordinador.equiposAdmin()).anySatisfy(e -> {
+        assertThat(coordinador.equiposAdmin(coord)).anySatisfy(e -> {
             assertThat(e.equipo().placa()).isEqualTo("USCO-EQ-403");
             assertThat(e.activo()).isFalse();
         });
@@ -203,12 +204,13 @@ class FlujoPrestamosTest {
     void gestionDeUsuariosCreaDesactivaYRestableceClave() {
         Long coord = id("coordinador@usco.edu.co");
         UsuarioRequest req = new UsuarioRequest("Pedro Pérez", "pedro.perez@usco.edu.co", "ESTUDIANTE", "1099000111", "20231100111", "Ing. Civil", "Pedro#2026ok");
-        assertThatThrownBy(() -> usuariosSrv.crear(new UsuarioRequest("Pedro", "pedro@gmail.com", "ESTUDIANTE", "1099000112", null, null, "Pedro#2026ok"))).hasMessageContaining("@usco.edu.co");
-        assertThatThrownBy(() -> usuariosSrv.crear(new UsuarioRequest("Pedro Pérez", "pedro2@usco.edu.co", "ADMIN", "1099000113", null, null, "Pedro#2026ok"))).hasMessageContaining("Rol");
-        assertThatThrownBy(() -> usuariosSrv.crear(new UsuarioRequest("Pedro Pérez", "pedro3@usco.edu.co", "ESTUDIANTE", "1099000114", null, null, "corta"))).hasMessageContaining("contraseña");
-        UsuarioAdminDto u = usuariosSrv.crear(req);
+        assertThatThrownBy(() -> usuariosSrv.crear(coord, new UsuarioRequest("Pedro", "pedro@gmail.com", "ESTUDIANTE", "1099000112", null, null, "Pedro#2026ok"))).hasMessageContaining("@usco.edu.co");
+        assertThatThrownBy(() -> usuariosSrv.crear(coord, new UsuarioRequest("Pedro Pérez", "pedro2@usco.edu.co", "ADMIN", "1099000113", null, null, "Pedro#2026ok"))).hasMessageContaining("Rol");
+        assertThatThrownBy(() -> usuariosSrv.crear(coord, new UsuarioRequest("Pedro Pérez", "pedro3@usco.edu.co", "ESTUDIANTE", "1099000114", null, null, "corta"))).hasMessageContaining("contraseña");
+        UsuarioAdminDto u = usuariosSrv.crear(coord, req);
+        assertThat(u.sede()).isEqualTo("neiva");
         assertThat(auth.login(new LoginRequest("pedro.perez@usco.edu.co", "Pedro#2026ok", false)).usuario().rol()).isEqualTo("ESTUDIANTE");
-        assertThatThrownBy(() -> usuariosSrv.crear(req)).hasMessageContaining("Ya existe");
+        assertThatThrownBy(() -> usuariosSrv.crear(coord, req)).hasMessageContaining("Ya existe");
 
         usuariosSrv.restablecerClave(u.id(), "Otra#Clave2026");
         assertThat(auth.login(new LoginRequest("pedro.perez@usco.edu.co", "Otra#Clave2026", false)).token()).isNotBlank();
@@ -219,7 +221,7 @@ class FlujoPrestamosTest {
 
     @Test
     void reporteExportadoEnmascaraDatosPersonalesNoPertinentes() {
-        String csv = coordinador.reporteCsv(null, null, null);
+        String csv = coordinador.reporteCsv(id("coordinador@usco.edu.co"), null, null, null);
         assertThat(csv).contains("Documento;Teléfono;Dirección").contains("••••••;••••••;••••••");
         assertThat(csv).doesNotContain("1075123456");
     }

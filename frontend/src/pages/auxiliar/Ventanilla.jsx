@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowDownLeft, ArrowUpRight, Ban, CalendarClock, CircleCheck, Clock, RefreshCw, Repeat2, Search, Wrench, TriangleAlert, ClipboardList, UserRound } from 'lucide-react'
 import { api } from '../../api/index.js'
+import { useSede } from '../../context/SedeContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useAhora, useDatos } from '../../lib/hooks.js'
 import { fmtFechaHora, fmtFranja, fmtHora, fmtVencimiento } from '../../lib/fecha.js'
@@ -11,6 +12,7 @@ import EntradaModal from './EntradaModal.jsx'
 import RechazoModal from './RechazoModal.jsx'
 
 export default function Ventanilla() {
+  const { ruta } = useSede()
   const { usuario } = useAuth()
   const ahora = useAhora(30000)
   const { datos, error, cargando, recargar } = useDatos(() => api.panel(), [], { cada: 10000 })
@@ -47,7 +49,7 @@ export default function Ventanilla() {
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:min-w-[640px]">
           <button className="btn-salida !min-h-[52px] text-[15px]" onClick={() => abrirSalida()}><ArrowUpRight className="h-5 w-5" aria-hidden="true" /> Registrar Salida</button>
           <button className="btn-entrada !min-h-[52px] text-[15px]" onClick={() => abrirEntrada()}><ArrowDownLeft className="h-5 w-5" aria-hidden="true" /> Registrar Entrada</button>
-          <Link to="/auxiliar/turno" className="btn-outline !min-h-[52px] text-[15px]"><Repeat2 className="h-5 w-5" aria-hidden="true" /> Cierre de Turno</Link>
+          <Link to={ruta('/auxiliar/turno')} className="btn-outline !min-h-[52px] text-[15px]"><Repeat2 className="h-5 w-5" aria-hidden="true" /> Cierre de Turno</Link>
         </div>
       </div>
 

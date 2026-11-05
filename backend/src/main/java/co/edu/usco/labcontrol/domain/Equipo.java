@@ -40,6 +40,10 @@ public class Equipo {
     @Column(name = "baja_motivo", length = 300) private String bajaMotivo;
     @Column(name = "baja_fecha") private LocalDateTime bajaFecha;
 
+    /** Sede dueña del equipo: solo la ven y lo prestan los usuarios y auxiliares de esa sede. */
+    @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "sede_id")
+    private Sede sede;
+
     protected Equipo() {}
 
     public Equipo(String placa, String nombre, String marca, String modelo, String numeroSerie, String categoria,
@@ -85,4 +89,6 @@ public class Equipo {
     public boolean isActivo() { return activo; }
     public String getBajaMotivo() { return bajaMotivo; }
     public LocalDateTime getBajaFecha() { return bajaFecha; }
+    public Sede getSede() { return sede; }
+    public void setSede(Sede sede) { this.sede = sede; }
 }

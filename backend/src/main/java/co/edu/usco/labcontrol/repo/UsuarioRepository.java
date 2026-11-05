@@ -14,4 +14,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     boolean existsByDocumento(String documento);
     List<Usuario> findAllByOrderByRolAscNombreAsc();
     List<Usuario> findByRolAndActivoTrue(Rol rol);
+    List<Usuario> findByRolAndActivoTrueAndSedeId(Rol rol, Long sedeId);
+    long countBySedeId(Long sedeId);
+    List<Usuario> findBySedeIsNullAndRolNot(Rol rol);
 }
