@@ -91,7 +91,7 @@ public class RegistroService {
         if (p != null) controlarReenvio(p, ahora);
         else p = new RegistroPendiente(mail, ahora);
         p.datos(nombre, doc, codigo, programa, encoder.encode(r.password()), sede);
-        return enviarCodigo(pendientes.save(p), ahora);
+        return enviarCodigo(p, ahora);
     }
 
     /** Reenvía un código nuevo (el anterior deja de servir). */
@@ -150,9 +150,11 @@ public class RegistroService {
     private RegistroIniciadoDto enviarCodigo(RegistroPendiente p, LocalDateTime ahora) {
         String codigo = String.format("%06d", AZAR.nextInt(1_000_000));
         p.nuevoCodigo(encoder.encode(codigo), ahora, ahora.plusMinutes(minutosCodigo));
+        p = pendientes.save(p);
         String primerNombre = p.getNombre().split(" ")[0];
         String enlace = appUrl + "/" + p.getSede().getSlug() + "/registro";
         String texto = """
+                
                 Hola %s:
 
                 Tu código de verificación de USCO LabControl es: %s

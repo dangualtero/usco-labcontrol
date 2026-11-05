@@ -5,19 +5,9 @@
     <link rel="icon" type="image/png" href="/escudo-usco.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#8F141B" />
-    <script>
-      (function () {
-        try {
-          var g = localStorage.getItem("usco.labcontrol.tema");
-          var oscuro = g ? g === "oscuro" : window.matchMedia("(prefers-color-scheme: dark)").matches;
-          if (oscuro) document.documentElement.classList.add("dark");
-        } catch (e) {}
-      })();
-    </script>
+    <!-- Aplica el modo oscuro antes de pintar (archivo propio: compatible con la CSP, sin scripts incrustados) -->
+    <script src="/tema.js"></script>
     <title>USCO LabControl · Préstamos de equipos de laboratorio</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>
