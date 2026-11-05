@@ -1,0 +1,78 @@
+# USCO LabControl completo en un servidor: MySQL + API + frontend (nginx) + n8n (agente de IA de los avisos).
+#   1) cp .env.example .env   y completa TODOS los valores
+#   2) docker compose -f docker-compose.prod.yml up -d --build
+#   3) Abre http://IP-DEL-SERVIDOR  (ver DESPLIEGUE.md para HTTPS y para configurar n8n)
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: labcontrol
+      MYSQL_USER: labcontrol
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Define MYSQL_PASSWORD en .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD en .env}
+      TZ: America/Bogota
+    command: --default-time-zone=-05:00 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --log-bin-trust-function-creators=1
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # La primera vez que se crea el volumen, MySQL ejecuta estos scripts en orden: estructura, triggers y datos.
+      - ./backend/db/01_esquema.sql:/docker-entrypoint-initdb.d/01_esquema.sql:ro
+      - ./backend/db/02_inmutabilidad.sql:/docker-entrypoint-initdb.d/02_inmutabilidad.sql:ro
+      - ./backend/db/03_datos_iniciales.sql:/docker-entrypoint-initdb.d/03_datos_iniciales.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_URL: jdbc:mysql://mysql:3306/labcontrol?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Bogota&characterEncoding=utf8
+      MYSQL_USER: labcontrol
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      LABCONTROL_JWT_SECRET: ${LABCONTROL_JWT_SECRET:?Define LABCONTROL_JWT_SECRET en .env}
+      LABCONTROL_APP_URL: ${LABCONTROL_APP_URL:?Define LABCONTROL_APP_URL en .env}
+      LABCONTROL_CORS: ${LABCONTROL_APP_URL}
+      LABCONTROL_SEED: ${LABCONTROL_SEED:-false}
+      LABCONTROL_SEED_HISTORIAL: ${LABCONTROL_SEED_HISTORIAL:-false}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      LABCONTROL_ALERTAS_DESTINO: ${LABCONTROL_ALERTAS_DESTINO:-u20232215593@usco.edu.co}
+      # n8n está en la misma red de Docker: el backend lo llama por su nombre de servicio
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/labcontrol-novedades}
+      N8N_WEBHOOK_TOKEN: ${N8N_WEBHOOK_TOKEN:?Define N8N_WEBHOOK_TOKEN en .env}
+      TZ: America/Bogota
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+  n8n:
+    image: n8nio/n8n:2.46.6
+    restart: unless-stopped
+    environment:
+      GENERIC_TIMEZONE: America/Bogota
+      TZ: America/Bogota
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Define N8N_ENCRYPTION_KEY en .env}
+      N8N_DIAGNOSTICS_ENABLED: "false"
+    # Solo accesible desde el propio servidor: para abrir el editor usa un túnel SSH (ver DESPLIEGUE.md).
+    ports:
+      - "127.0.0.1:5678:5678"
+    volumes:
+      - n8n-data:/home/node/.n8n
+
+volumes:
+  mysql-data:
+  n8n-data:
