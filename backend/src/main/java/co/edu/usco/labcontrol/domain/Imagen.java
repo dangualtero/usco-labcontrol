@@ -12,21 +12,19 @@ import java.time.LocalDateTime;
 @Table(name = "imagenes")
 public class Imagen {
     /** Identificador aleatorio (UUID sin guiones): no se puede adivinar ni recorrer en orden. */
-    @Id @Column(length = 32)
+    @Id
     private String id;
 
     /** image/jpeg, image/png o image/webp (verificado por la firma del archivo, no por la extensión). */
-    @Column(name = "tipo_contenido", nullable = false, length = 20)
     private String tipoContenido;
 
-    @Lob @Basic(fetch = FetchType.LAZY)
-    @Column(nullable = false, columnDefinition = "LONGBLOB")
+    @Lob
     private byte[] datos;
 
-    @Column(nullable = false) private long tamano;
-    @Column(name = "nombre_original", length = 160) private String nombreOriginal;
-    @Column(name = "subida_por", nullable = false, length = 120) private String subidaPor;
-    @Column(name = "subida_en", nullable = false) private LocalDateTime subidaEn;
+    private long tamano;
+    private String nombreOriginal;
+    private String subidaPor;
+    private LocalDateTime subidaEn;
 
     protected Imagen() {}
 

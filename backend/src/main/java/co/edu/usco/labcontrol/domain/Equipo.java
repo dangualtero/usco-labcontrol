@@ -10,38 +10,36 @@ public class Equipo {
     private Long id;
 
     /** Placa de inventario, formato USCO-EQ-000 (PU-07, PA-09). */
-    @Column(nullable = false, unique = true, length = 20)
     private String placa;
 
-    @Column(nullable = false, length = 120) private String nombre;
-    @Column(length = 60) private String marca;
-    @Column(length = 60) private String modelo;
-    @Column(name = "numero_serie", length = 60) private String numeroSerie;
-    @Column(nullable = false, length = 60) private String categoria;
-    @Column(nullable = false, length = 40) private String laboratorio;
+    private String nombre;
+    private String marca;
+    private String modelo;
+    private String numeroSerie;
+    private String categoria;
+    private String laboratorio;
     /** Ubicación física exacta dentro del laboratorio (ej. «Bloque B · Lab. Electrónica · Mesa 3»). */
-    @Column(length = 160) private String ubicacion;
-    @Column(length = 500) private String descripcion;
+    private String ubicacion;
+    private String descripcion;
     /** Especificaciones separadas por el caracter pipe. */
-    @Column(length = 600) private String specs;
+    private String specs;
     /** Accesorios incluidos en el préstamo, separados por el caracter pipe. */
-    @Column(length = 600) private String accesorios;
+    private String accesorios;
     /** Condición física: Excelente, Bueno, Regular o Deteriorado. */
-    @Column(name = "estado_fisico", length = 30) private String estadoFisico = "Bueno";
+    private String estadoFisico = "Bueno";
     /** Ruta local (/images/equipos/...) o URL de la fotografía. */
-    @Column(name = "foto_url", length = 400) private String fotoUrl;
+    private String fotoUrl;
 
-    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
     private EstadoEquipo estado = EstadoEquipo.DISPONIBLE;
 
     /** Soft delete (PS-08): el equipo dado de baja se conserva para auditoría. */
-    @Column(nullable = false)
     private boolean activo = true;
-    @Column(name = "baja_motivo", length = 300) private String bajaMotivo;
-    @Column(name = "baja_fecha") private LocalDateTime bajaFecha;
+    private String bajaMotivo;
+    private LocalDateTime bajaFecha;
 
     /** Sede dueña del equipo: solo la ven y lo prestan los usuarios y auxiliares de esa sede. */
-    @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "sede_id")
+    @ManyToOne
     private Sede sede;
 
     protected Equipo() {}

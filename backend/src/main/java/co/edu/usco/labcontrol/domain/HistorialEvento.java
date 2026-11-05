@@ -10,23 +10,23 @@ import org.hibernate.annotations.Immutable;
  */
 @Entity
 @Immutable
-@Table(name = "historial_eventos", indexes = @Index(name = "idx_hist_fecha", columnList = "fecha"))
+@Table(name = "historial_eventos")
 public class HistorialEvento {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false) private LocalDateTime fecha;
+    private LocalDateTime fecha;
     /** RESERVA, CANCELACION, RECHAZO, SALIDA, ENTRADA, INCIDENCIA, CUSTODIA, ALTA, ESTADO, BAJA */
-    @Column(nullable = false, length = 20) private String tipo;
-    @Column(length = 20) private String placa;
-    @Column(length = 120) private String equipoNombre;
-    @Column(length = 40) private String laboratorio;
-    @Column(length = 20) private String prestamoCodigo;
-    @Column(length = 120) private String usuarioNombre;
-    @Column(length = 120) private String auxiliarNombre;
-    @Column(length = 600) private String detalle;
+    private String tipo;
+    private String placa;
+    private String equipoNombre;
+    private String laboratorio;
+    private String prestamoCodigo;
+    private String usuarioNombre;
+    private String auxiliarNombre;
+    private String detalle;
     /** Slug de la sede del equipo. Los eventos anteriores a las sedes quedan en null y pertenecen a la sede principal. */
-    @Column(length = 40) private String sede;
+    private String sede;
 
     protected HistorialEvento() {}
 

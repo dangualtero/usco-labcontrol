@@ -15,7 +15,9 @@ spring:
     password: ${MYSQL_PASSWORD:LabControl#2026}
   jpa:
     hibernate:
-      ddl-auto: update
+      # La estructura de la base de datos vive en backend/db/*.sql (tablas, llaves, índices, CHECK y triggers).
+      # El backend NO crea ni modifica tablas: solo lee y escribe datos.
+      ddl-auto: none
     open-in-view: false
   jackson:
     serialization:
@@ -25,6 +27,19 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 6MB
+  # Correo saliente (SMTP). Si MAIL_HOST queda vacío, los correos NO se envían: el código de verificación se escribe
+  # en la consola del backend (útil para probar en local). Con Gmail usa smtp.gmail.com y una «contraseña de aplicación».
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 15000
+      mail.smtp.writetimeout: 15000
 
 labcontrol:
   jwt:
@@ -35,9 +50,26 @@ labcontrol:
   cors:
     origenes: ${LABCONTROL_CORS:http://localhost:5173,http://127.0.0.1:5173}
   seed:
-    # Crea usuarios y equipos iniciales solo si la base está vacía.
-    habilitado: ${LABCONTROL_SEED:true}
+    # Los datos iniciales vienen de backend/db/03_datos_iniciales.sql. En true, el backend además los crearía
+    # desde Java si la tabla de usuarios estuviera vacía (solo útil para pruebas).
+    habilitado: ${LABCONTROL_SEED:false}
     # Préstamos, reservas e historial de ejemplo para que los paneles tengan información al iniciar.
     historial-ejemplo: ${LABCONTROL_SEED_HISTORIAL:true}
   reglas:
     limite-equipos-por-usuario: 3
+  # Dirección pública del frontend: se usa en los enlaces de los correos.
+  app-url: ${LABCONTROL_APP_URL:http://localhost:5173}
+  correo:
+    remitente: ${MAIL_FROM:${MAIL_USERNAME:}}
+    nombre-remitente: ${MAIL_FROM_NAME:USCO LabControl}
+  registro:
+    # Autorregistro de estudiantes con código de verificación enviado al correo @usco.edu.co.
+    habilitado: ${LABCONTROL_REGISTRO:true}
+    minutos-codigo: 15
+  novedades:
+    # Correo institucional que recibe los avisos cuando un auxiliar reporta un equipo agotado, dañado o perdido.
+    destino: ${LABCONTROL_ALERTAS_DESTINO:u20232215593@usco.edu.co}
+    # Flujo de n8n (agente de IA que redacta y prioriza el aviso). Vacío = se envía un correo con plantilla.
+    n8n-webhook-url: ${N8N_WEBHOOK_URL:}
+    n8n-token: ${N8N_WEBHOOK_TOKEN:}
+    n8n-timeout-segundos: ${N8N_TIMEOUT:90}

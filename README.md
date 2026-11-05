@@ -20,6 +20,7 @@ Cada persona puede cambiar su contraseña en **Mi cuenta**, y el Coordinador pue
 
 | Persona | Rol (panel al que entra) | Correo | Contraseña |
 |---|---|---|---|
+| Administrador LabControl | COORDINADOR (general) | `admin@usco.edu.co` | `Admin#USCO2026` |
 | Daniel Felipe Gualtero | COORDINADOR · Dashboard, historial, inventario y usuarios | `daniel.gualtero@usco.edu.co` | `Daniel#USCO2026` |
 | Carlos David Neira Vega | AUXILIAR · Ventanilla, inventario y cierre de turno | `carlos.neira@usco.edu.co` | `Carlos#USCO2026` |
 | Cesar Sneider Pimiento Torres | ESTUDIANTE · Catálogo, mis reservas, mi historial | `cesar.pimiento@usco.edu.co` | `Cesar#USCO2026` |
@@ -33,8 +34,7 @@ Cada persona puede cambiar su contraseña en **Mi cuenta**, y el Coordinador pue
 | Camila Rojas (cód. 20221100013) | ESTUDIANTE | `camila.rojas@usco.edu.co` | `Camila#USCO2026` |
 | Sebastián Medina (cód. 20211100014) | ESTUDIANTE | `sebastian.medina@usco.edu.co` | `Sebastian#USCO2026` |
 
-> Estas son las **contraseñas iniciales** de la carga de datos (`DataInitializer.java`). **Cámbialas antes de publicar el sistema fuera de la red de pruebas.**
-> Las cuentas solo se crean si la tabla `usuarios` está vacía.
+> Estas son las **contraseñas iniciales** de `backend/db/03_datos_iniciales.sql` (guardadas con BCrypt). **Cámbialas antes de publicar el sistema fuera de la red de pruebas.**
 
 ## Cómo ejecutarlo
 
@@ -52,10 +52,11 @@ Paso a paso:
 
 ```bash
 # 1) MySQL 8 con la base «labcontrol» (elige UNA opción)
-.\iniciar-mysql.ps1                       # instancia portátil en el puerto 3307 (no toca otro MySQL del equipo)
+.\iniciar-mysql.ps1                       # instancia portátil en el puerto 3307 (la primera vez también crea la base)
+.\crear-base-datos.ps1                    # crea o vuelve a crear la base desde backend/db/*.sql (BORRA los datos)
 docker compose up -d                      # o MySQL en Docker (cp .env.example .env; usa MYSQL_URL con el puerto 3306)
 
-# 2) API Spring Boot (puerto 8080) — crea las tablas y carga usuarios/equipos la primera vez
+# 2) API Spring Boot (puerto 8080) — usa las tablas creadas por los scripts SQL (no las modifica)
 cd backend && mvn spring-boot:run         # o ejecutar LabControlApplication desde IntelliJ
 
 # 3) Frontend (puerto 5173; /api se reenvía a 8080)
@@ -73,8 +74,21 @@ Variables de entorno de la API (los valores por defecto sirven para el desarroll
 | `LABCONTROL_SEED` | `true` | Carga inicial de usuarios e inventario si la base está vacía |
 | `LABCONTROL_SEED_HISTORIAL` | `true` | Incluye préstamos, reservas e historial de ejemplo; en `false` arranca con inventario y usuarios solamente |
 
-Para empezar de cero: `DROP DATABASE labcontrol; CREATE DATABASE labcontrol CHARACTER SET utf8mb4;` y reiniciar la API.
-Opcional: `mysql -u root -p labcontrol < backend/db/inmutabilidad.sql` agrega triggers que impiden UPDATE/DELETE en el historial.
+### Base de datos: definida 100 % en SQL
+
+La estructura completa vive en `backend/db/` y el backend **no crea ni modifica tablas** (`spring.jpa.hibernate.ddl-auto: none`). Las clases Java solo conservan las anotaciones mínimas para leer y escribir (`@Entity`, `@Table`, `@Id`, `@ManyToOne`, `@Enumerated`…). Longitudes, obligatoriedad, únicos, llaves foráneas, índices, valores permitidos (`CHECK`) y triggers están en MySQL.
+
+| Script | Qué hace |
+|---|---|
+| `00_usuario_mysql.sql` | Base `labcontrol` y usuario de la aplicación, con permisos solo de datos (SELECT, INSERT, UPDATE, DELETE) |
+| `01_esquema.sql` | 9 tablas con sus llaves, índices y restricciones (**borra y recrea** las tablas) |
+| `02_inmutabilidad.sql` | Triggers que impiden UPDATE y DELETE en `historial_eventos` |
+| `03_datos_iniciales.sql` | Sede Neiva, 13 cuentas (contraseñas BCrypt) y 19 equipos |
+| `04_claves_en_texto_normal.sql` | Solo para bases creadas antes: permite escribir contraseñas normales en los INSERT |
+
+**Crear usuarios con un INSERT:** escribe la contraseña normal en `password_hash` (por ejemplo `'Usco#2026'`). El backend la cifra con BCrypt a los pocos segundos (`CifradoContrasenas`), o en el primer inicio de sesión si la persona entra antes. Mientras tanto, la contraseña se ve en texto normal en la base, así que usa una contraseña inicial y pide que la cambien en **Mi cuenta**.
+
+Para ejecutarlos: `.\crear-base-datos.ps1` (MySQL portátil), o abre cada archivo en IntelliJ (**Database**) y ejecútalo en orden con root. En Docker se ejecutan solos la primera vez.
 
 ## Funcionalidades por rol (todas contra MySQL)
 
@@ -83,6 +97,19 @@ Opcional: `mysql -u root -p labcontrol < backend/db/inmutabilidad.sql` agrega tr
 - **Coordinador general:** sedes, presupuesto por sede, dashboard con KPIs y gráficos, **historial inmutable** con filtros y exportación CSV sanitizada, **CRUD de equipos** (crear, editar, mantenimiento, baja lógica) y **gestión de usuarios** (crear con rol, activar/desactivar, restablecer contraseña).
 - **Seguridad:** login único por correo `@usco.edu.co` y contraseña, JWT, BCrypt, autorización por rol en el servidor (`SecurityConfig`) y en el cliente (`RequiereRol`), bloqueo temporal tras 5 intentos fallidos, mensajes de error genéricos, el rol y el estado de la cuenta se verifican en la base de datos en **cada** petición, cierre de sesión por inactividad (sin «Recordar mi sesión»).
 - **Concurrencia:** bloqueo pesimista sobre el equipo (`SELECT … FOR UPDATE`): cero préstamos duplicados.
+
+## Registro con código, avisos con IA y despliegue (v1.3)
+
+- **Registro de estudiantes** (`/neiva/registro`, enlace en el ingreso): el estudiante llena sus datos y recibe un **código de 6 dígitos** en su correo @usco.edu.co. Solo al ingresar el código se crea su cuenta en MySQL y se abre la sesión. El código vence en 15 minutos, admite 5 intentos y se puede reenviar cada 60 segundos. Sin correo configurado, el código aparece en la consola del backend (`CORREO NO ENVIADO`).
+- **Novedades de equipos:** el auxiliar usa **Inventario → Reportar novedad** (agotado, dañado, perdido, falla…) y puede enviar el equipo a mantenimiento en el mismo paso. Un **agente de IA en n8n** prioriza el reporte (ALTA/MEDIA/BAJA), redacta el correo y lo envía a `LABCONTROL_ALERTAS_DESTINO` (por defecto `u20232215593@usco.edu.co`). Si n8n no responde, el backend envía el aviso con una plantilla. El coordinador ve las novedades, la prioridad y la acción sugerida en **Inventario**. Configuración: [n8n/README.md](n8n/README.md).
+- **Publicar en la web:** `docker-compose.prod.yml` levanta MySQL, la API, el frontend (nginx) y n8n. Paso a paso: [DESPLIEGUE.md](DESPLIEGUE.md).
+
+| Variable nueva | Para qué |
+|---|---|
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | Envío de correos (Gmail: `smtp.gmail.com`, `587`, contraseña de aplicación) |
+| `LABCONTROL_ALERTAS_DESTINO` | Correo que recibe los avisos de novedades |
+| `N8N_WEBHOOK_URL`, `N8N_WEBHOOK_TOKEN` | Flujo de n8n y token compartido (credencial Header Auth `X-LabControl-Token`) |
+| `LABCONTROL_APP_URL` | Dirección pública del frontend (para los enlaces de los correos) |
 
 ## Sedes, presupuesto y fotografías (v1.2)
 
@@ -97,7 +124,7 @@ Opcional: `mysql -u root -p labcontrol < backend/db/inmutabilidad.sql` agrega tr
 - Cada estudiante, docente y auxiliar **pertenece a una sede**: solo ve el inventario, los préstamos y el historial de esa sede. Si intenta ingresar por la dirección de otra, el sistema le dice a qué sede pertenece.
 - El **Coordinador general** (rol COORDINADOR) administra todas las sedes y cambia entre ellas con el selector del encabezado; las pantallas conservan la sección (Inventario, Usuarios, Presupuesto…).
 - El frontend envía la sede en la cabecera `X-Sede`; el servidor solo la respeta para el coordinador. A los demás siempre les aplica su propia sede.
-- **Migración automática:** al arrancar la API con esta versión se crea la *Sede Neiva* y se le asignan todos los equipos y usuarios existentes. No hay que ejecutar SQL: `ddl-auto: update` agrega las columnas `sede_id` y las tablas `sedes`, `presupuesto_movimientos` e `imagenes`.
+- **Sede principal:** `03_datos_iniciales.sql` crea la *Sede Neiva* y le asigna los equipos y usuarios de ejemplo.
 
 ### Coordinador → Sedes
 Crear sede (ciudad → dirección web, p. ej. «La Plata» → `/la-plata`), editar nombre y dirección física, activar/desactivar (desactivar no borra datos; impide el ingreso de sus usuarios). Los usuarios nuevos se crean en la sede que está abierta.

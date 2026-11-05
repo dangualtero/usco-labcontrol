@@ -9,37 +9,37 @@ import java.time.LocalDateTime;
  * ni se borran: un error se corrige anulándolo (queda visible con su motivo y deja de contar en el saldo).
  */
 @Entity
-@Table(name = "presupuesto_movimientos", indexes = @Index(name = "idx_presupuesto_sede_fecha", columnList = "sede_id,fecha"))
+@Table(name = "presupuesto_movimientos")
 public class MovimientoPresupuesto {
     public enum Tipo { INGRESO, GASTO }
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.EAGER, optional = false) @JoinColumn(name = "sede_id")
+    @ManyToOne
     private Sede sede;
 
-    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 10)
+    @Enumerated(EnumType.STRING)
     private Tipo tipo;
 
     /** Ej. «Asignación presupuestal 2026-2», «Compra de osciloscopio», «Mantenimiento centrífuga». */
-    @Column(nullable = false, length = 160) private String concepto;
+    private String concepto;
     /** Ej. Asignación, Compra de equipos, Mantenimiento, Insumos, Otro. */
-    @Column(nullable = false, length = 40) private String categoria;
+    private String categoria;
     /** Valor en pesos colombianos (COP), siempre positivo; el signo lo da el tipo. */
-    @Column(nullable = false) private long monto;
+    private long monto;
     /** Fecha del movimiento (la del soporte o factura). */
-    @Column(nullable = false) private LocalDate fecha;
+    private LocalDate fecha;
     /** Placa del equipo relacionado, si aplica (compra o mantenimiento de un equipo). */
-    @Column(length = 20) private String placa;
+    private String placa;
 
-    @Column(name = "registrado_por", nullable = false, length = 120) private String registradoPor;
-    @Column(name = "registrado_en", nullable = false) private LocalDateTime registradoEn;
+    private String registradoPor;
+    private LocalDateTime registradoEn;
 
-    @Column(nullable = false) private boolean anulado = false;
-    @Column(name = "anulacion_motivo", length = 300) private String anulacionMotivo;
-    @Column(name = "anulado_por", length = 120) private String anuladoPor;
-    @Column(name = "anulado_en") private LocalDateTime anuladoEn;
+    private boolean anulado = false;
+    private String anulacionMotivo;
+    private String anuladoPor;
+    private LocalDateTime anuladoEn;
 
     protected MovimientoPresupuesto() {}
 

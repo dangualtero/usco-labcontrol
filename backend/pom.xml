@@ -38,6 +38,11 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
+    <!-- Correo: códigos de verificación del registro y respaldo de los avisos de novedades -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-mail</artifactId>
+    </dependency>
 
     <!-- Perfil por defecto (dev): H2 en modo MySQL. Perfil "mysql": MySQL 8 -->
     <dependency>

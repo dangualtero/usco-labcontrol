@@ -33,6 +33,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/auth/login", "/api/salud").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/registro", "/api/auth/registro/verificar", "/api/auth/registro/reenviar").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/sedes", "/api/imagenes/*").permitAll()
                 .requestMatchers("/api/auth/**").authenticated()
                 .requestMatchers("/api/equipos/**").authenticated()

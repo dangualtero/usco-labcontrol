@@ -6,6 +6,7 @@ import { SedeLayout, useSede } from './context/SedeContext.jsx'
 import Shell from './components/Shell.jsx'
 import Login from './pages/Login.jsx'
 import ElegirSede from './pages/ElegirSede.jsx'
+import Registro from './pages/Registro.jsx'
 import Catalogo from './pages/usuario/Catalogo.jsx'
 import MisReservas from './pages/usuario/MisReservas.jsx'
 import MiHistorial from './pages/usuario/MiHistorial.jsx'
@@ -88,6 +89,7 @@ export default function App() {
       <Route path="/:sede" element={<SedeLayout />}>
         <Route index element={<RaizSede />} />
         <Route path="login" element={<Login />} />
+        <Route path="registro" element={<Registro />} />
         <Route element={<RequiereSesion />}>
           <Route element={<RequiereRol grupo="USUARIO" />}>
             <Route path="usuario" element={<Navigate to="catalogo" replace />} />

@@ -57,6 +57,16 @@ export function AuthProvider({ children }) {
     return r.usuario
   }, [])
 
+  /** Abre la sesión con la respuesta del servidor (p. ej. al verificar el código de registro). */
+  const abrirSesion = useCallback((r) => {
+    setToken(r.token)
+    const s = { token: r.token, usuario: r.usuario }
+    guardar(s, false)
+    ultimo.current = Date.now()
+    setSesion({ ...s, recordar: false })
+    return r.usuario
+  }, [])
+
   /** Cierra la sesión y destruye el token (PS-06). */
   const cerrar = useCallback((motivo) => {
     setToken(null)
@@ -90,8 +100,8 @@ export function AuthProvider({ children }) {
     grupo: sesion?.usuario?.grupo ?? null,
     // Inicio del rol en su sede (el Coordinador general, en la sede que esté viendo).
     home: sesion ? homeDe(sesion.usuario.grupo, sesion.usuario.sede ?? getSede()) : '/',
-    validando, conectado, restante, iniciar, cerrar, continuar, reintentar: () => { reintentarTodo(); validar() },
-  }), [sesion, validando, conectado, restante, iniciar, cerrar, continuar, validar])
+    validando, conectado, restante, iniciar, abrirSesion, cerrar, continuar, reintentar: () => { reintentarTodo(); validar() },
+  }), [sesion, validando, conectado, restante, iniciar, abrirSesion, cerrar, continuar, validar])
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>
 }

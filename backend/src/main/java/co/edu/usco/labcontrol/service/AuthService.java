@@ -50,7 +50,7 @@ public class AuthService {
 
         // Mensaje único y genérico: no revela si el correo existe ni cuál dato falló (PS-08).
         Usuario u = usuarios.findByCorreoIgnoreCase(correo).filter(Usuario::isActivo).orElse(null);
-        boolean ok = u != null && encoder.matches(r.password(), u.getPasswordHash());
+        boolean ok = u != null && claveCorrecta(u, r.password());
         if (!ok) {
             fallos.merge(correo, new Intentos(1, clock.instant()),
                     (a, b) -> new Intentos(a.n() + 1, a.n() + 1 >= MAX_INTENTOS ? clock.instant() : a.desde()));
@@ -60,6 +60,23 @@ public class AuthService {
         verificarSede(u, r.sede());
         boolean recordar = Boolean.TRUE.equals(r.recordar());
         return new LoginResponse(jwt.generar(u, recordar), mapper.usuario(u), jwt.expiraEnSegundos(recordar));
+    }
+
+    /**
+     * Compara la contraseña escrita con la guardada. Si en la base quedó en texto normal (usuario creado con un INSERT
+     * y aún no cifrado por {@link CifradoContrasenas}), la acepta si coincide y la cifra en ese mismo momento.
+     */
+    private boolean claveCorrecta(Usuario u, String escrita) {
+        if (escrita == null) return false;
+        String guardada = u.getPasswordHash();
+        if (CifradoContrasenas.esHash(guardada)) return encoder.matches(escrita, guardada);
+        boolean igual = guardada != null && java.security.MessageDigest.isEqual(
+                guardada.getBytes(java.nio.charset.StandardCharsets.UTF_8), escrita.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        if (igual) {
+            u.setPasswordHash(encoder.encode(escrita));
+            usuarios.save(u);
+        }
+        return igual;
     }
 
     /**

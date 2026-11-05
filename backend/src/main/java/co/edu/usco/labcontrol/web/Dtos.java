@@ -102,4 +102,20 @@ public final class Dtos {
     // ---- Imágenes ----
     /** url: ruta lista para guardar en fotoUrl (ej. /api/imagenes/3f9c…). */
     public record ImagenSubidaDto(String id, String url, long tamano, String tipo) {}
+
+    // ---- Registro de estudiantes con código al correo ----
+    public record RegistroRequest(String nombre, String correo, String documento, String codigoEstudiantil, String programa,
+                                  String password, String sede) {}
+    /** correoEnviado = false cuando el SMTP no está configurado: el código quedó en la consola del backend (modo local). */
+    public record RegistroIniciadoDto(String correo, int minutosVigencia, int reenviarEnSegundos, boolean correoEnviado) {}
+    public record VerificarRegistroRequest(String correo, String codigo) {}
+    public record ReenviarCodigoRequest(String correo) {}
+
+    // ---- Novedades de equipos (aviso por agente de IA en n8n) ----
+    /** tipo: AGOTADO, DANADO, PERDIDO, FALLA u OTRO. mantenimiento = retirar el equipo del préstamo mientras se revisa. */
+    public record NovedadRequest(String tipo, String descripcion, Boolean mantenimiento) {}
+    public record NovedadDto(Long id, String sede, String placa, String equipoNombre, String laboratorio, String tipo, String tipoTexto,
+                             String descripcion, String reportadoPor, LocalDateTime creadoEn, boolean enMantenimiento, String prioridad,
+                             String asunto, String resumenIa, String accionSugerida, String notificacion, String notificacionDetalle,
+                             String destinatario, LocalDateTime notificadoEn) {}
 }

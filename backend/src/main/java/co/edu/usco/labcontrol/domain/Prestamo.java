@@ -4,52 +4,48 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "prestamos", indexes = {
-        @Index(name = "idx_prestamo_equipo_estado", columnList = "equipo_id,estado"),
-        @Index(name = "idx_prestamo_solicitante", columnList = "solicitante_id,estado")
-})
+@Table(name = "prestamos")
 public class Prestamo {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     /** Código de reserva / préstamo visible al usuario (ej. RES-48213). */
-    @Column(nullable = false, unique = true, length = 20)
     private String codigo;
 
-    @ManyToOne(fetch = FetchType.EAGER, optional = false) @JoinColumn(name = "equipo_id")
+    @ManyToOne
     private Equipo equipo;
 
-    @ManyToOne(fetch = FetchType.EAGER, optional = false) @JoinColumn(name = "solicitante_id")
+    @ManyToOne
     private Usuario solicitante;
 
-    @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "auxiliar_salida_id")
+    @ManyToOne
     private Usuario auxiliarSalida;
 
-    @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "auxiliar_entrada_id")
+    @ManyToOne
     private Usuario auxiliarEntrada;
 
     /** Auxiliar que tiene la custodia vigente (cambia con el Cierre de Turno, PF-12). */
-    @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "custodio_id")
+    @ManyToOne
     private Usuario custodio;
 
-    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
     private EstadoPrestamo estado;
 
-    @Column(length = 120) private String asignatura;
+    private String asignatura;
     /** Docente de la asignatura (motivo académico). Opcional. */
-    @Column(length = 120) private String docente;
+    private String docente;
 
     private LocalDateTime franjaInicio;
     private LocalDateTime franjaFin;
-    @Column(nullable = false) private LocalDateTime fechaSolicitud;
+    private LocalDateTime fechaSolicitud;
     private LocalDateTime fechaSalida;
     private LocalDateTime fechaLimite;
     private LocalDateTime fechaEntrada;
 
     /** BUEN_ESTADO | CON_NOVEDAD */
-    @Column(length = 20) private String estadoEntrada;
-    @Column(length = 600) private String observaciones;
-    @Column(length = 20) private String incidencia;
+    private String estadoEntrada;
+    private String observaciones;
+    private String incidencia;
 
     protected Prestamo() {}
 

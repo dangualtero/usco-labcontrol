@@ -8,33 +8,26 @@ public class Usuario {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 120)
     private String nombre;
 
-    @Column(nullable = false, unique = true, length = 120)
     private String correo;
 
-    @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
-    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
     private Rol rol;
 
-    @Column(nullable = false, unique = true, length = 20)
     private String documento;
 
     /** Código estudiantil (solo estudiantes); permite buscar en ventanilla por código o por documento. */
-    @Column(name = "codigo_estudiantil", unique = true, length = 20)
     private String codigoEstudiantil;
 
-    @Column(length = 80)
     private String programa;
 
-    @Column(nullable = false)
     private boolean activo = true;
 
     /** Sede a la que pertenece. Estudiantes, docentes y auxiliares tienen una; el Coordinador (general) no tiene: administra todas. */
-    @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "sede_id")
+    @ManyToOne
     private Sede sede;
 
     protected Usuario() {}

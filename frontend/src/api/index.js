@@ -78,6 +78,11 @@ export const api = {
   yo: () => get('/auth/yo'),
   cambiarClave: (actual, nueva) => post('/auth/cambiar-clave', { actual, nueva }),
 
+  // Registro de estudiantes con código de verificación al correo institucional
+  registro: (r) => post('/auth/registro', { ...r, sede }),
+  verificarRegistro: (correo, codigo) => post('/auth/registro/verificar', { correo, codigo }),
+  reenviarCodigo: (correo) => post('/auth/registro/reenviar', { correo }),
+
   // Catálogo
   equipos: (f = {}) => get('/equipos', { laboratorio: todos(f.laboratorio), categoria: todos(f.categoria), q: f.q }),
   equipoDetalle: (placa) => get(`/equipos/${encodeURIComponent(placa)}`),
@@ -96,6 +101,9 @@ export const api = {
   cierreTurno: () => get('/ventanilla/cierre-turno'),
   transferirCustodia: (id) => post('/ventanilla/cierre-turno', { auxiliarDestinoId: id }),
   estadoEquipoAux: (placa, estado, motivo) => post(`/ventanilla/equipos/${encodeURIComponent(placa)}/estado`, { estado, motivo }),
+  // Novedades (agotado, dañado, perdido…): avisan al correo institucional mediante el agente de IA de n8n
+  reportarNovedad: (placa, r) => post(`/ventanilla/equipos/${encodeURIComponent(placa)}/novedades`, r),
+  novedadesAux: () => get('/ventanilla/novedades'),
 
   // Coordinador
   kpis: (f = {}) => get('/coordinador/kpis', f),
@@ -122,6 +130,10 @@ export const api = {
   presupuestoResumen: () => get('/coordinador/presupuesto/resumen'),
   registrarMovimiento: (r) => post('/coordinador/presupuesto/movimientos', r),
   anularMovimiento: (id, motivo) => post(`/coordinador/presupuesto/movimientos/${id}/anular`, { motivo }),
+
+  // Coordinador · novedades reportadas por los auxiliares
+  novedadesCoord: () => get('/coordinador/novedades'),
+  reenviarNovedad: (id) => post(`/coordinador/novedades/${id}/reenviar`),
 
   // Coordinador · fotografías desde el computador o el celular
   subirImagen: (archivo) => {

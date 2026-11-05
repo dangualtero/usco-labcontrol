@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { MapPin, RefreshCw, Search, Wrench, CircleCheck } from 'lucide-react'
+import { MapPin, RefreshCw, Search, Wrench, CircleCheck, TriangleAlert } from 'lucide-react'
 import { api } from '../../api/index.js'
 import { useDatos } from '../../lib/hooks.js'
 import { LABORATORIOS, norm } from '../../lib/constantes.js'
 import { Cargando, ErrorCaja, EquipoFoto, EstadoBadge, Vacio } from '../../components/ui.jsx'
 import EstadoEquipoModal from '../../components/EstadoEquipoModal.jsx'
+import { NovedadesLista, ReportarNovedadModal } from '../../components/Novedades.jsx'
 
 /** Inventario operativo del auxiliar: consulta del estado y envío a mantenimiento / reactivación de equipos. */
 export default function InventarioAux() {
@@ -13,6 +14,8 @@ export default function InventarioAux() {
   const [lab, setLab] = useState('todos')
   const [estado, setEstado] = useState('todos')
   const [modal, setModal] = useState(null)
+  const [novedad, setNovedad] = useState(null)
+  const [refrescar, setRefrescar] = useState(0)
 
   const lista = useMemo(() => {
     const nq = norm(q)
@@ -27,10 +30,12 @@ export default function InventarioAux() {
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-usco">Panel de Ventanilla</p>
           <h1 className="text-2xl font-extrabold sm:text-3xl">Inventario de laboratorios</h1>
-          <p className="text-sm text-pizarra">Consulta la ubicación y el estado de cada equipo. Puedes enviar a mantenimiento los equipos que no estén prestados.</p>
+          <p className="text-sm text-pizarra">Consulta la ubicación y el estado de cada equipo. Puedes enviar a mantenimiento los equipos que no estén prestados y reportar novedades (agotado, dañado, perdido…).</p>
         </div>
         <button onClick={recargar} disabled={cargando} className="btn-outline"><RefreshCw className={`h-4 w-4 ${cargando ? 'animate-spin' : ''}`} aria-hidden="true" /> Actualizar</button>
       </div>
+
+      <NovedadesLista cargar={api.novedadesAux} refrescar={refrescar} titulo="Novedades de la sede" />
 
       <section className="card grid gap-3 p-4 sm:grid-cols-[1fr_200px_200px]" aria-label="Filtros">
         <div className="relative"><label htmlFor="ia-q" className="sr-only">Buscar equipo</label><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-pizarra" aria-hidden="true" />
@@ -57,7 +62,10 @@ export default function InventarioAux() {
                 <p className="text-sm text-pizarra">{e.marca} · {e.modelo}{e.numeroSerie ? ` · S/N ${e.numeroSerie}` : ''}</p>
                 <p className="flex items-start gap-1.5 text-[13px] text-slate-700"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-usco" aria-hidden="true" /> {e.ubicacion ?? 'Ubicación no registrada'}</p>
                 <EstadoBadge estado={e.estado} className="self-start" />
-                <div className="mt-auto pt-2">
+                <div className="mt-auto space-y-2 pt-2">
+                  <button className="btn-outline btn-sm w-full border-alerta-borde/60 text-alerta-texto hover:bg-alerta-fondo" onClick={() => setNovedad(e)}>
+                    <TriangleAlert className="h-4 w-4" aria-hidden="true" /> Reportar novedad
+                  </button>
                   {e.estado === 'PRESTADO' ? <p className="text-xs font-semibold text-pizarra">En préstamo: registra su entrada para cambiar el estado.</p> : (
                     <button className="btn-outline btn-sm w-full" onClick={() => setModal(e)}>
                       {e.estado === 'MANTENIMIENTO' ? <><CircleCheck className="h-4 w-4" aria-hidden="true" /> Marcar disponible</> : <><Wrench className="h-4 w-4" aria-hidden="true" /> Enviar a mantenimiento</>}
@@ -70,6 +78,7 @@ export default function InventarioAux() {
         </ul>
       )}
 
+      <ReportarNovedadModal equipo={novedad} onCerrar={() => setNovedad(null)} onHecho={() => { recargar(); setRefrescar((n) => n + 1) }} />
       <EstadoEquipoModal equipo={modal} accion={api.estadoEquipoAux} onCerrar={() => setModal(null)} onHecho={recargar} />
     </div>
   )

@@ -25,7 +25,7 @@ Start-Process -WindowStyle Hidden -FilePath $mysqld -ArgumentList "--basedir=`"$
 for ($i = 0; $i -lt 30; $i++) { Start-Sleep 1; if (Get-NetTCPConnection -LocalPort $Puerto -State Listen -ErrorAction SilentlyContinue) { break } }
 
 if ($primera) {
-  # Usuario de la aplicación (credenciales por defecto de desarrollo; cámbialas en producción con MYSQL_USER / MYSQL_PASSWORD)
-  & $mysql -uroot -h127.0.0.1 -P $Puerto -e "CREATE DATABASE IF NOT EXISTS labcontrol CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS 'labcontrol'@'%' IDENTIFIED BY 'LabControl#2026'; GRANT ALL ON labcontrol.* TO 'labcontrol'@'%';"
+  # Base de datos completa desde los scripts SQL (usuario de la aplicación, tablas, triggers y datos iniciales)
+  & (Join-Path $PSScriptRoot 'crear-base-datos.ps1') -Puerto $Puerto -Confirmar
 }
 Write-Host "MySQL listo en el puerto $Puerto (base de datos: labcontrol)."

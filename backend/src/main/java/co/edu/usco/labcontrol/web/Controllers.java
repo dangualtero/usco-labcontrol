@@ -28,8 +28,9 @@ public final class Controllers {
         private final AuthService auth;
         private final SedeService sedes;
         private final ImagenService imagenes;
-        public PublicoController(AuthService auth, SedeService sedes, ImagenService imagenes) {
-            this.auth = auth; this.sedes = sedes; this.imagenes = imagenes;
+        private final RegistroService registro;
+        public PublicoController(AuthService auth, SedeService sedes, ImagenService imagenes, RegistroService registro) {
+            this.auth = auth; this.sedes = sedes; this.imagenes = imagenes; this.registro = registro;
         }
 
         /** Sedes (pública): la usa la pantalla «Elige tu sede» y la validación de /neiva, /pitalito… */
@@ -50,6 +51,17 @@ public final class Controllers {
 
         @PostMapping("/auth/login")
         public LoginResponse login(@Valid @RequestBody LoginRequest r) { return auth.login(r); }
+
+        /** Registro de estudiantes, paso 1: datos → código de 6 dígitos al correo @usco.edu.co. */
+        @PostMapping("/auth/registro")
+        public RegistroIniciadoDto registro(@RequestBody RegistroRequest r) { return registro.iniciar(r); }
+
+        /** Paso 2: código correcto → se crea la cuenta y se devuelve la sesión iniciada. */
+        @PostMapping("/auth/registro/verificar")
+        public LoginResponse verificar(@RequestBody VerificarRegistroRequest r) { return registro.verificar(r); }
+
+        @PostMapping("/auth/registro/reenviar")
+        public RegistroIniciadoDto reenviar(@RequestBody ReenviarCodigoRequest r) { return registro.reenviar(r); }
 
         /** Datos del usuario de la sesión (el cliente lo usa para validar un token guardado). */
         @GetMapping("/auth/yo")
@@ -108,9 +120,19 @@ public final class Controllers {
     public static class VentanillaController {
         private final PrestamoService servicio;
         private final InventarioService inventario;
-        public VentanillaController(PrestamoService servicio, InventarioService inventario) {
-            this.servicio = servicio; this.inventario = inventario;
+        private final NovedadService novedades;
+        public VentanillaController(PrestamoService servicio, InventarioService inventario, NovedadService novedades) {
+            this.servicio = servicio; this.inventario = inventario; this.novedades = novedades;
         }
+
+        /** El auxiliar reporta que un equipo se agotó, se dañó, se perdió o falla: se avisa al correo institucional. */
+        @PostMapping("/equipos/{placa}/novedades")
+        public NovedadDto reportar(@AuthenticationPrincipal AuthUser u, @PathVariable String placa, @RequestBody NovedadRequest r) {
+            return novedades.reportar(u.id(), placa, r);
+        }
+
+        @GetMapping("/novedades")
+        public List<NovedadDto> novedades(@AuthenticationPrincipal AuthUser u) { return novedades.listar(u.id()); }
 
         @GetMapping("/panel")
         public PanelDto panel(@AuthenticationPrincipal AuthUser u) { return servicio.panel(u.id()); }
@@ -287,5 +309,19 @@ public final class Controllers {
         public ImagenSubidaDto subir(@AuthenticationPrincipal AuthUser u, @RequestParam("archivo") MultipartFile archivo) {
             return imagenes.subir(u.id(), archivo);
         }
+    }
+
+    /** Novedades reportadas por los auxiliares de la sede abierta, con el resultado del aviso (Coordinador). */
+    @RestController
+    @RequestMapping("/api/coordinador/novedades")
+    public static class NovedadesController {
+        private final NovedadService novedades;
+        public NovedadesController(NovedadService novedades) { this.novedades = novedades; }
+
+        @GetMapping
+        public List<NovedadDto> listar(@AuthenticationPrincipal AuthUser u) { return novedades.listar(u.id()); }
+
+        @PostMapping("/{id}/reenviar")
+        public NovedadDto reenviar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id) { return novedades.reenviar(u.id(), id); }
     }
 }

@@ -15,18 +15,16 @@ public class Sede {
     private Long id;
 
     /** Identificador para la URL: minúsculas, sin tildes ni espacios (ej. «pitalito», «la-plata»). */
-    @Column(nullable = false, unique = true, length = 40)
     private String slug;
 
     /** Nombre visible, ej. «Sede Pitalito». */
-    @Column(nullable = false, unique = true, length = 80)
     private String nombre;
 
-    @Column(nullable = false, length = 60) private String ciudad;
-    @Column(length = 160) private String direccion;
+    private String ciudad;
+    private String direccion;
 
-    @Column(nullable = false) private boolean activa = true;
-    @Column(name = "creada_en", nullable = false) private LocalDateTime creadaEn;
+    private boolean activa = true;
+    private LocalDateTime creadaEn;
 
     protected Sede() {}
 

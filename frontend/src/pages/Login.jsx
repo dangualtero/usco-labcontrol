@@ -152,7 +152,10 @@ export default function Login() {
               </button>
             </form>
 
-            <p className="mt-5 text-center text-xs text-slate-500">¿Olvidaste tu contraseña? Solicita su restablecimiento a la Coordinación de Laboratorios.</p>
+            <p className="mt-5 rounded-lg border border-slate-200 bg-white px-4 py-3 text-center text-sm text-pizarra">
+              ¿Eres estudiante y aún no tienes cuenta? <Link to={ruta('/registro')} className="font-bold text-usco hover:underline">Regístrate con tu correo institucional</Link>
+            </p>
+            <p className="mt-4 text-center text-xs text-slate-500">¿Olvidaste tu contraseña? Solicita su restablecimiento a la Coordinación de Laboratorios.</p>
             <p className="mt-2 text-center text-[11px] text-slate-400">USCO LabControl · v1.1.0 · Conexión institucional</p>
           </div>
         </div>

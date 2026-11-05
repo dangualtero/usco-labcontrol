@@ -18,5 +18,9 @@ services:
       - "3306:3306"
     volumes:
       - labcontrol-data:/var/lib/mysql
+      # Primera vez: estructura, triggers y datos desde los scripts SQL
+      - ./backend/db/01_esquema.sql:/docker-entrypoint-initdb.d/01_esquema.sql:ro
+      - ./backend/db/02_inmutabilidad.sql:/docker-entrypoint-initdb.d/02_inmutabilidad.sql:ro
+      - ./backend/db/03_datos_iniciales.sql:/docker-entrypoint-initdb.d/03_datos_iniciales.sql:ro
 volumes:
   labcontrol-data:

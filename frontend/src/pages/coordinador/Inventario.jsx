@@ -9,6 +9,7 @@ import { fmtFechaHora } from '../../lib/fecha.js'
 import { Campo, Cargando, ErrorCaja, EquipoFoto, EstadoBadge, Modal } from '../../components/ui.jsx'
 import EstadoEquipoModal from '../../components/EstadoEquipoModal.jsx'
 import EquipoFormModal from './EquipoFormModal.jsx'
+import { NovedadesLista } from '../../components/Novedades.jsx'
 
 /** Inventario del coordinador: alta, edición, mantenimiento y baja lógica de equipos (PV-08, PV-09, PS-08). */
 export default function Inventario() {
@@ -60,6 +61,8 @@ export default function Inventario() {
         <div><label htmlFor="i-l" className="sr-only">Laboratorio</label>
           <select id="i-l" className="input" value={lab} onChange={(e) => setLab(e.target.value)}><option value="todos">Todos los laboratorios</option>{LABORATORIOS.map((l) => <option key={l}>{l}</option>)}</select></div>
       </section>
+
+      <NovedadesLista cargar={api.novedadesCoord} reenviar={api.reenviarNovedad} titulo="Novedades reportadas por los auxiliares" />
 
       <ErrorCaja mensaje={error} />
       {!datos && !error && <Cargando />}
