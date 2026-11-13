@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BellRing, Bot, CircleAlert, CircleCheck, Clock, Mail, MailWarning, RefreshCw, Send } from 'lucide-react'
+import { BellRing, Bot, CalendarClock, CircleAlert, CircleCheck, Clock, Mail, MailCheck, MailWarning, RefreshCw, Send } from 'lucide-react'
 import { api } from '../api/index.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { fmtFechaHora } from '../lib/fecha.js'
@@ -13,14 +13,16 @@ export const TIPOS_NOVEDAD = [
   { valor: 'OTRO', texto: 'Otra novedad' },
 ]
 
-const PRIORIDAD = {
+export const PRIORIDAD = {
   ALTA: 'border-red-600 bg-red-50 text-red-900',
   MEDIA: 'border-amber-600 bg-amber-50 text-amber-900',
   BAJA: 'border-emerald-600 bg-emerald-50 text-emerald-900',
 }
 
-const AVISO = {
-  PENDIENTE: { icono: Clock, texto: 'Enviando aviso…', clase: 'text-pizarra' },
+export const AVISO = {
+  PENDIENTE: { icono: Clock, texto: 'Analizando y enviando…', clase: 'text-pizarra' },
+  PENDIENTE_RESUMEN: { icono: CalendarClock, texto: 'Irá en el resumen diario', clase: 'text-blue-900' },
+  ENVIADA_RESUMEN: { icono: MailCheck, texto: 'Enviado en el resumen diario', clase: 'text-emerald-800' },
   ENVIADA_IA: { icono: Bot, texto: 'Aviso enviado · redactado por IA', clase: 'text-emerald-800' },
   ENVIADA_PLANTILLA: { icono: Mail, texto: 'Aviso enviado con plantilla', clase: 'text-emerald-800' },
   SIN_CONFIGURAR: { icono: MailWarning, texto: 'Correo sin configurar', clase: 'text-amber-700' },
@@ -47,7 +49,7 @@ export function ReportarNovedadModal({ equipo, onCerrar, onHecho }) {
     setEnviando(true); setError('')
     try {
       await api.reportarNovedad(equipo.placa, { tipo, descripcion: descripcion.trim(), mantenimiento })
-      toast.exito('Novedad reportada', 'Se está enviando el aviso al correo de la coordinación.')
+      toast.exito('Novedad reportada', 'Si es de prioridad alta se avisará de inmediato a la coordinación; si no, irá en el resumen diario.')
       onHecho?.(); onCerrar()
     } catch (err) { setError(err.message) } finally { setEnviando(false) }
   }
@@ -82,7 +84,7 @@ export function ReportarNovedadModal({ equipo, onCerrar, onHecho }) {
           )}
           <p className="flex items-start gap-2 rounded-lg bg-slate-100 px-3 py-2.5 text-xs text-pizarra">
             <Bot className="mt-0.5 h-4 w-4 shrink-0 text-usco" aria-hidden="true" />
-            Un agente de IA analiza el reporte, le asigna prioridad (alta, media o baja) y envía el aviso al correo institucional de la coordinación.
+            Un agente de IA analiza el reporte y le asigna prioridad. Los de prioridad <strong>alta</strong> se envían de inmediato al correo de la coordinación; los de prioridad media y baja llegan en el resumen diario.
           </p>
           <ErrorCaja mensaje={error} />
         </form>

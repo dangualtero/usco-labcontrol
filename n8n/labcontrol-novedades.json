@@ -12,7 +12,7 @@
       "id": "04dec78c-2ce3-4b74-9eb6-7a7a13365ad5",
       "name": "Webhook LabControl",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.2,
+      "typeVersion": 2.1,
       "position": [
         0,
         0
@@ -54,7 +54,7 @@
       "id": "11dadd50-06ac-46e4-b36a-9b5142ab0664",
       "name": "Modelo Claude (Anthropic)",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.6,
+      "typeVersion": 1.5,
       "position": [
         260,
         220
@@ -87,8 +87,8 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        820,
-        0
+        1080,
+        -100
       ],
       "onError": "continueRegularOutput"
     },
@@ -103,13 +103,13 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1080,
-        0
+        1340,
+        -100
       ]
     },
     {
       "parameters": {
-        "content": "## USCO LabControl · Avisos de novedades\n1. **Webhook LabControl** → credencial *Header Auth*: nombre `X-LabControl-Token`, valor = `N8N_WEBHOOK_TOKEN` del backend.\n2. **Modelo Claude** → credencial *Anthropic API* (tu API key). Puedes cambiar el modelo.\n3. **Enviar correo** → credencial *SMTP* (p. ej. Gmail con contraseña de aplicación) y cambia el remitente.\n4. Activa el flujo y copia la *Production URL* en `N8N_WEBHOOK_URL` del backend.",
+        "content": "## USCO LabControl · Avisos de novedades\n1. **Webhook LabControl** → credencial *Header Auth*: nombre `X-LabControl-Token`, valor = `N8N_WEBHOOK_TOKEN` del backend.\n2. **Modelo Claude** → credencial *Anthropic API* (tu API key). Puedes cambiar el modelo.\n3. **Enviar correo** → credencial *SMTP* (p. ej. Gmail con contraseña de aplicación) y cambia el remitente.\n4. Activa el flujo y copia la *Production URL* en `N8N_WEBHOOK_URL` del backend.\n\n**Política de correo:** solo la prioridad **ALTA** se envía al instante (nodo «¿Prioridad ALTA?»). MEDIA y BAJA responden sin correo y el backend las incluye en el **resumen diario** (7:00 a. m.).",
         "height": 300,
         "width": 520,
         "color": 5
@@ -121,6 +121,55 @@
       "position": [
         -40,
         -420
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c0a1e3f2-alta-0001",
+              "leftValue": "={{ $json.prioridad === 'ALTA' || $('Webhook LabControl').first().json.body.forzarCorreo === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5f1d7c2e-1b0a-4a51-9a51-alta00000001",
+      "name": "¿Prioridad ALTA?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        820,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ prioridad: $('Interpretar respuesta de la IA').first().json.prioridad, asunto: $('Interpretar respuesta de la IA').first().json.asunto, resumen: $('Interpretar respuesta de la IA').first().json.resumen, accionSugerida: $('Interpretar respuesta de la IA').first().json.accionSugerida, priorizadoPorIa: $('Interpretar respuesta de la IA').first().json.priorizadoPorIa, correoEnviado: false }) }}",
+        "options": {}
+      },
+      "id": "5f1d7c2e-1b0a-4a51-9a51-resumen00001",
+      "name": "Responder sin correo (va al resumen diario)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1080,
+        120
       ]
     }
   ],
@@ -162,7 +211,7 @@
       "main": [
         [
           {
-            "node": "Enviar correo institucional",
+            "node": "¿Prioridad ALTA?",
             "type": "main",
             "index": 0
           }
@@ -174,6 +223,24 @@
         [
           {
             "node": "Responder a LabControl",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Prioridad ALTA?": {
+      "main": [
+        [
+          {
+            "node": "Enviar correo institucional",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder sin correo (va al resumen diario)",
             "type": "main",
             "index": 0
           }

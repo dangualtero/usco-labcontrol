@@ -1,16 +1,19 @@
 import { useState } from 'react'
-import { CalendarClock, CalendarX2, PackageCheck } from 'lucide-react'
+import { Beaker, CalendarClock, CalendarX2, PackageCheck } from 'lucide-react'
 import { api } from '../../api/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAhora, useDatos } from '../../lib/hooks.js'
 import { fmtFechaHora, fmtFranja, fmtVencimiento } from '../../lib/fecha.js'
 import { AlertaRetraso, Cargando, Confirmar, ErrorCaja, PrestamoBadge, Vacio } from '../../components/ui.jsx'
+import { EstadoSolicitud, pedido } from '../auxiliar/SolicitudesInsumo.jsx'
 
 export default function MisReservas() {
   const toast = useToast()
   const ahora = useAhora(30000)
   const { datos, error, recargar } = useDatos(() => api.misPrestamos(), [], { cada: 8000 })
   const [cancelar, setCancelar] = useState(null)
+  const [cancelarInsumo, setCancelarInsumo] = useState(null)
+  const { datos: insumos, recargar: recargarInsumos } = useDatos(() => api.misInsumos(), [], { cada: 10000 })
 
   const reservas = (datos ?? []).filter((p) => p.estado === 'RESERVADO')
   const activos = (datos ?? []).filter((p) => p.estado === 'ACTIVO')
@@ -22,11 +25,17 @@ export default function MisReservas() {
     setCancelar(null)
   }
 
+  const confirmarCancelarInsumo = async () => {
+    try { await api.cancelarInsumo(cancelarInsumo.id); toast.exito('Solicitud cancelada', cancelarInsumo.codigo); recargarInsumos() }
+    catch (e) { toast.error('No se pudo cancelar', e.message) }
+    setCancelarInsumo(null)
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-extrabold">Mis reservas y préstamos en curso</h1>
-        <p className="text-sm text-pizarra">Equipos que tienes reservados o que ya retiraste de ventanilla.</p>
+        <h1 className="text-2xl font-extrabold">Mis reservas, préstamos e insumos</h1>
+        <p className="text-sm text-pizarra">Equipos que tienes reservados o que ya retiraste de ventanilla, y los insumos que has pedido.</p>
       </div>
       <ErrorCaja mensaje={error} />
       {!datos && !error && <Cargando />}
@@ -78,6 +87,34 @@ export default function MisReservas() {
           </section>
         </>
       )}
+      <section aria-labelledby="h-ins">
+        <h2 id="h-ins" className="mb-3 flex items-center gap-2 text-lg font-extrabold"><Beaker className="h-5 w-5 text-usco" aria-hidden="true" /> Mis solicitudes de insumos ({(insumos ?? []).length})</h2>
+        {insumos && insumos.length === 0 ? <Vacio icono={Beaker} titulo="No has pedido insumos" detalle="En el catálogo, pestaña «Insumos», elige uno y pide la cantidad que necesitas." /> : (
+          <ul className="grid gap-3 md:grid-cols-2">
+            {(insumos ?? []).slice(0, 20).map((s) => (
+              <li key={s.id} className={`card p-4 ${s.estado === 'RECHAZADA' ? 'border-alerta-borde' : ''}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div><p className="font-extrabold">{s.insumo}</p><p className="text-sm text-pizarra"><span className="font-mono font-semibold">{s.placa}</span> · {s.laboratorio}</p></div>
+                  <EstadoSolicitud estado={s.estado} />
+                </div>
+                <p className="mt-2 text-lg font-extrabold">{pedido(s)}</p>
+                <p className="text-sm text-slate-700">«{s.motivo}»</p>
+                <p className="text-xs text-pizarra">{fmtFechaHora(s.creadoEn)}{s.resueltoPor ? ` · atendió ${s.resueltoPor}` : ''}</p>
+                {s.respuesta && <p className={`mt-1 text-sm ${s.estado === 'RECHAZADA' ? 'font-semibold text-alerta-texto' : 'text-pizarra'}`}>{s.respuesta}</p>}
+                {s.estado === 'PENDIENTE' && (
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <span className="rounded bg-slate-100 px-2 py-1 font-mono text-sm font-bold text-usco">{s.codigo}</span>
+                    <button className="btn-outline btn-sm" onClick={() => setCancelarInsumo(s)}>Cancelar solicitud</button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <Confirmar abierto={!!cancelarInsumo} titulo="Cancelar solicitud de insumo" mensaje={`¿Cancelar la solicitud ${cancelarInsumo?.codigo}?`} textoOk="Sí, cancelar" textoCancelar="Mantener" peligro
+        onCancelar={() => setCancelarInsumo(null)} onOk={confirmarCancelarInsumo} />
       <Confirmar abierto={!!cancelar} titulo="Cancelar reserva" mensaje={`¿Cancelar la reserva ${cancelar?.codigo}?`} textoOk="Sí, cancelar reserva" textoCancelar="Mantener reserva" peligro
         onCancelar={() => setCancelar(null)} onOk={confirmarCancelar} />
     </div>

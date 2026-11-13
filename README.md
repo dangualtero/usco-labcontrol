@@ -81,10 +81,11 @@ La estructura completa vive en `backend/db/` y el backend **no crea ni modifica 
 | Script | Qué hace |
 |---|---|
 | `00_usuario_mysql.sql` | Base `labcontrol` y usuario de la aplicación, con permisos solo de datos (SELECT, INSERT, UPDATE, DELETE) |
-| `01_esquema.sql` | 9 tablas con sus llaves, índices y restricciones (**borra y recrea** las tablas) |
+| `01_esquema.sql` | 12 tablas con sus llaves, índices y restricciones (**borra y recrea** las tablas) |
 | `02_inmutabilidad.sql` | Triggers que impiden UPDATE y DELETE en `historial_eventos` |
-| `03_datos_iniciales.sql` | Sede Neiva, 13 cuentas (contraseñas BCrypt) y 19 equipos |
+| `03_datos_iniciales.sql` | Sede Neiva, sus 4 laboratorios, 13 cuentas (contraseñas BCrypt), 19 equipos y 5 insumos de ejemplo |
 | `04_claves_en_texto_normal.sql` | Solo para bases creadas antes: permite escribir contraseñas normales en los INSERT |
+| `05_insumos_laboratorios_reportes.sql` | Solo para bases creadas antes de la v1.4: agrega insumos y cantidades, laboratorios por sede, seguimiento de reportes y solicitudes de insumos. No borra nada y se puede ejecutar varias veces (`.\actualizar-base-datos.ps1`) |
 
 **Crear usuarios con un INSERT:** escribe la contraseña normal en `password_hash` (por ejemplo `'Usco#2026'`). El backend la cifra con BCrypt a los pocos segundos (`CifradoContrasenas`), o en el primer inicio de sesión si la persona entra antes. Mientras tanto, la contraseña se ve en texto normal en la base, así que usa una contraseña inicial y pide que la cambien en **Mi cuenta**.
 
@@ -98,6 +99,17 @@ Para ejecutarlos: `.\crear-base-datos.ps1` (MySQL portátil), o abre cada archiv
 - **Seguridad:** login único por correo `@usco.edu.co` y contraseña, JWT, BCrypt, autorización por rol en el servidor (`SecurityConfig`) y en el cliente (`RequiereRol`), bloqueo temporal tras 5 intentos fallidos, mensajes de error genéricos, el rol y el estado de la cuenta se verifican en la base de datos en **cada** petición, cierre de sesión por inactividad (sin «Recordar mi sesión»).
 - **Concurrencia:** bloqueo pesimista sobre el equipo (`SELECT … FOR UPDATE`): cero préstamos duplicados.
 
+## Insumos, reportes en tiempo real, alertas y laboratorios (v1.4)
+
+- **Inventario con dos categorías:** **equipos** (se prestan, placa `USCO-EQ-000`) e **insumos** (se consumen, placa `USCO-IN-000`). Filtro Todos · Equipos · Insumos en el inventario del coordinador, del auxiliar y en el catálogo.
+- **Cantidades con unidad de medida:** implementos por unidades (1, 2, 3…), líquidos en **mL o L**, sólidos en **mg, g o kg** y longitudes en **cm o m**. Cada insumo tiene una *cantidad de referencia* (100 %).
+- **Solicitudes de insumos:** el estudiante o docente pide una cantidad (puede pedir 250 mL de un insumo que se guarda en litros) y el **auxiliar la aprueba** —se descuenta de las existencias y queda en el historial como `CONSUMO`— **o la rechaza** con motivo. Auxiliar → **Insumos**; estudiante → **Mis reservas**.
+- **Alertas** (coordinador y auxiliar): insumo **agotado** o con **25 % o menos** de su referencia, reportes ALTA/MEDIA sin resolver, préstamos vencidos, equipos en mantenimiento y solicitudes pendientes. Filtros por tipo de alerta y por elemento (equipos/insumos, laboratorio, búsqueda).
+- **Reportes:** todos los reportes de la sede **en tiempo real** (se revisa cada 5 s y avisa cuando llega uno nuevo), filtros por estado, prioridad, tipo y aviso, y **seguimiento** Abierto → En proceso → Resuelto con comentarios.
+- **Correo:** solo la prioridad **ALTA** se envía al instante. MEDIA y BAJA se acumulan y salen en un **resumen diario** (7:00 a. m., `LABCONTROL_RESUMEN_CRON`) junto con los insumos en alerta. Botón «Enviar resumen diario ahora» en Reportes.
+- **Laboratorios por sede:** Coordinador → **Laboratorios** (crear, editar, desactivar). Los equipos e insumos se asignan a un laboratorio de su sede.
+- **Dashboard:** presupuesto disponible (sede y total), laboratorios de la sede, sedes existentes, insumos en alerta y reportes sin resolver.
+
 ## Registro con código, avisos con IA y despliegue (v1.3)
 
 - **Registro de estudiantes** (`/neiva/registro`, enlace en el ingreso): el estudiante llena sus datos y recibe un **código de 6 dígitos** en su correo @usco.edu.co. Solo al ingresar el código se crea su cuenta en MySQL y se abre la sesión. El código vence en 15 minutos, admite 5 intentos y se puede reenviar cada 60 segundos. Sin correo configurado, el código aparece en la consola del backend (`CORREO NO ENVIADO`).
@@ -110,6 +122,7 @@ Para ejecutarlos: `.\crear-base-datos.ps1` (MySQL portátil), o abre cada archiv
 | `LABCONTROL_ALERTAS_DESTINO` | Correo que recibe los avisos de novedades |
 | `N8N_WEBHOOK_URL`, `N8N_WEBHOOK_TOKEN` | Flujo de n8n y token compartido (credencial Header Auth `X-LabControl-Token`) |
 | `LABCONTROL_APP_URL` | Dirección pública del frontend (para los enlaces de los correos) |
+| `LABCONTROL_RESUMEN_CRON`, `LABCONTROL_RESUMEN_ZONA` | Hora del resumen diario (por defecto `0 0 7 * * *`, `America/Bogota`) |
 
 ## Sedes, presupuesto y fotografías (v1.2)
 

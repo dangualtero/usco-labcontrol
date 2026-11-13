@@ -34,7 +34,23 @@ public class Mapper {
     public EquipoDto equipo(Equipo e) {
         return new EquipoDto(e.getPlaca(), e.getNombre(), e.getMarca(), e.getModelo(), e.getNumeroSerie(),
                 e.getCategoria(), e.getLaboratorio(), e.getUbicacion(), e.getDescripcion(), lista(e.getSpecs()),
-                lista(e.getAccesorios()), e.getEstadoFisico(), e.getFotoUrl(), e.getEstado().name());
+                lista(e.getAccesorios()), e.getEstadoFisico(), e.getFotoUrl(), e.getEstado().name(), e.getTipo().name(),
+                e.getCantidad(), e.getUnidad().name(), e.getCantidadReferencia(), e.porcentaje());
+    }
+
+    /** 1.500 L → «1,5 L»; 3 UNIDAD → «3 und». */
+    public static String cantidad(java.math.BigDecimal c, Unidad u) {
+        if (c == null) return "—";
+        String n = c.stripTrailingZeros().toPlainString().replace('.', ',');
+        return n + " " + (u == null ? "" : u.simbolo());
+    }
+
+    public SolicitudInsumoDto solicitud(SolicitudInsumo s) {
+        Equipo e = s.getEquipo();
+        return new SolicitudInsumoDto(s.getId(), s.getCodigo(), e.getPlaca(), e.getNombre(), e.getLaboratorio(),
+                s.getSolicitante().getNombre(), s.getSolicitante().getDocumento(), s.getCantidad(), s.getUnidad().name(),
+                s.getCantidadEquivalente(), e.getUnidad().name(), e.getCantidad(), s.getEstado().name(), s.getMotivo(),
+                s.getAsignatura(), s.getCreadoEn(), s.getResueltoEn(), s.getResueltoPor(), s.getRespuesta());
     }
 
     public PrestamoDto prestamo(Prestamo p) {

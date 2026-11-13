@@ -14,7 +14,7 @@ CREATE DATABASE IF NOT EXISTS labcontrol CHARACTER SET utf8mb4 COLLATE utf8mb4_u
 USE labcontrol;
 
 SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS reportes_novedad, registros_pendientes, imagenes, presupuesto_movimientos,
+DROP TABLE IF EXISTS seguimiento_novedad, solicitudes_insumo, laboratorios, reportes_novedad, registros_pendientes, imagenes, presupuesto_movimientos,
                      historial_eventos, prestamos, equipos, usuarios, sedes;
 SET FOREIGN_KEY_CHECKS = 1;
 
@@ -60,7 +60,27 @@ CREATE TABLE usuarios (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------------------------------------------------------
--- Equipos de laboratorio. Las bajas son lógicas (activo = FALSE): el registro se conserva para auditoría.
+-- Laboratorios: cada sede tiene los suyos y el Coordinador los crea desde «Laboratorios».
+-- Los equipos guardan el NOMBRE del laboratorio (equipos.laboratorio) para que el historial no cambie.
+-- -----------------------------------------------------------------------------------------------------
+CREATE TABLE laboratorios (
+  id           BIGINT       NOT NULL AUTO_INCREMENT,
+  sede_id      BIGINT       NOT NULL,
+  nombre       VARCHAR(40)  NOT NULL,
+  ubicacion    VARCHAR(160) NULL,
+  descripcion  VARCHAR(300) NULL,
+  activo       BOOLEAN      NOT NULL DEFAULT TRUE,
+  creado_en    DATETIME(6)  NOT NULL,
+  CONSTRAINT pk_laboratorios        PRIMARY KEY (id),
+  CONSTRAINT uk_laboratorios_nombre UNIQUE (sede_id, nombre),
+  CONSTRAINT fk_laboratorios_sede   FOREIGN KEY (sede_id) REFERENCES sedes (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------------------------------
+-- Inventario: EQUIPOS (se prestan; placa USCO-EQ-000) e INSUMOS (se consumen; placa USCO-IN-000).
+-- cantidad + unidad: UNIDAD (piezas: 1, 2, 3…), ML / L (líquidos), MG / G / KG (sólidos), CM / M (longitud).
+-- cantidad_referencia = cantidad «llena» (100 %): se alerta cuando un insumo queda en 25 % o menos.
+-- Las bajas son lógicas (activo = FALSE): el registro se conserva para auditoría.
 -- -----------------------------------------------------------------------------------------------------
 CREATE TABLE equipos (
   id             BIGINT       NOT NULL AUTO_INCREMENT,
@@ -82,10 +102,17 @@ CREATE TABLE equipos (
   baja_motivo    VARCHAR(300) NULL,
   baja_fecha     DATETIME(6)  NULL,
   sede_id        BIGINT       NULL,
+  tipo                 VARCHAR(10)    NOT NULL DEFAULT 'EQUIPO',
+  cantidad             DECIMAL(14,3)  NOT NULL DEFAULT 1,
+  unidad               VARCHAR(10)    NOT NULL DEFAULT 'UNIDAD',
+  cantidad_referencia  DECIMAL(14,3)  NULL COMMENT '100 % del insumo; alerta con 25 % o menos',
   CONSTRAINT pk_equipos         PRIMARY KEY (id),
   CONSTRAINT uk_equipos_placa   UNIQUE (placa),
   CONSTRAINT fk_equipos_sede    FOREIGN KEY (sede_id) REFERENCES sedes (id),
-  CONSTRAINT ck_equipos_placa   CHECK (placa LIKE 'USCO-EQ-___'),
+  CONSTRAINT ck_equipos_placa   CHECK ((tipo = 'EQUIPO' AND placa LIKE 'USCO-EQ-___') OR (tipo = 'INSUMO' AND placa LIKE 'USCO-IN-___')),
+  CONSTRAINT ck_equipos_tipo    CHECK (tipo IN ('EQUIPO', 'INSUMO')),
+  CONSTRAINT ck_equipos_unidad  CHECK (unidad IN ('UNIDAD', 'ML', 'L', 'MG', 'G', 'KG', 'CM', 'M') AND (tipo = 'INSUMO' OR unidad = 'UNIDAD')),
+  CONSTRAINT ck_equipos_cantidad CHECK (cantidad >= 0 AND (cantidad_referencia IS NULL OR cantidad_referencia > 0)),
   CONSTRAINT ck_equipos_estado  CHECK (estado IN ('DISPONIBLE', 'PRESTADO', 'MANTENIMIENTO')),
   CONSTRAINT ck_equipos_fisico  CHECK (estado_fisico IS NULL OR estado_fisico IN ('Excelente', 'Bueno', 'Regular', 'Deteriorado'))
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
@@ -133,7 +160,7 @@ CREATE TABLE prestamos (
 CREATE TABLE historial_eventos (
   id               BIGINT       NOT NULL AUTO_INCREMENT,
   fecha            DATETIME(6)  NOT NULL,
-  tipo             VARCHAR(20)  NOT NULL COMMENT 'RESERVA, CANCELACION, RECHAZO, SALIDA, ENTRADA, INCIDENCIA, CUSTODIA, ALTA, ESTADO, BAJA, NOVEDAD',
+  tipo             VARCHAR(20)  NOT NULL COMMENT 'RESERVA, CANCELACION, RECHAZO, SALIDA, ENTRADA, INCIDENCIA, CUSTODIA, ALTA, ESTADO, BAJA, NOVEDAD, CONSUMO, SEGUIMIENTO',
   placa            VARCHAR(20)  NULL,
   equipo_nombre    VARCHAR(120) NULL,
   laboratorio      VARCHAR(40)  NULL,
@@ -236,11 +263,64 @@ CREATE TABLE reportes_novedad (
   destinatario           VARCHAR(120)  NULL,
   notificado_en          DATETIME(6)   NULL,
   intentos_notificacion  INT           NOT NULL DEFAULT 0,
+  estado                 VARCHAR(12)   NOT NULL DEFAULT 'ABIERTO' COMMENT 'Seguimiento: ABIERTO → EN_PROCESO → RESUELTO',
+  actualizado_en         DATETIME(6)   NULL,
   CONSTRAINT pk_reportes_novedad     PRIMARY KEY (id),
   CONSTRAINT fk_novedad_sede         FOREIGN KEY (sede_id)   REFERENCES sedes (id),
   CONSTRAINT fk_novedad_equipo       FOREIGN KEY (equipo_id) REFERENCES equipos (id),
   CONSTRAINT ck_novedad_tipo         CHECK (tipo IN ('AGOTADO', 'DANADO', 'PERDIDO', 'FALLA', 'OTRO')),
   CONSTRAINT ck_novedad_prioridad    CHECK (prioridad IS NULL OR prioridad IN ('ALTA', 'MEDIA', 'BAJA')),
-  CONSTRAINT ck_novedad_notificacion CHECK (notificacion IN ('PENDIENTE', 'ENVIADA_IA', 'ENVIADA_PLANTILLA', 'SIN_CONFIGURAR', 'FALLIDA')),
+  CONSTRAINT ck_novedad_notificacion CHECK (notificacion IN ('PENDIENTE', 'ENVIADA_IA', 'ENVIADA_PLANTILLA', 'SIN_CONFIGURAR', 'FALLIDA',
+                                                            'PENDIENTE_RESUMEN', 'ENVIADA_RESUMEN')),
+  CONSTRAINT ck_novedad_estado       CHECK (estado IN ('ABIERTO', 'EN_PROCESO', 'RESUELTO')),
   INDEX idx_novedad_sede_fecha (sede_id, creado_en)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------------------------------
+-- Seguimiento de cada reporte: cambios de estado y comentarios (solo se agregan, no se editan).
+-- -----------------------------------------------------------------------------------------------------
+CREATE TABLE seguimiento_novedad (
+  id               BIGINT       NOT NULL AUTO_INCREMENT,
+  reporte_id       BIGINT       NOT NULL,
+  fecha            DATETIME(6)  NOT NULL,
+  autor            VARCHAR(120) NOT NULL,
+  estado_anterior  VARCHAR(12)  NULL,
+  estado_nuevo     VARCHAR(12)  NOT NULL,
+  comentario       VARCHAR(600) NOT NULL,
+  CONSTRAINT pk_seguimiento_novedad PRIMARY KEY (id),
+  CONSTRAINT fk_seguimiento_reporte FOREIGN KEY (reporte_id) REFERENCES reportes_novedad (id),
+  CONSTRAINT ck_seguimiento_estado  CHECK (estado_nuevo IN ('ABIERTO', 'EN_PROCESO', 'RESUELTO')),
+  INDEX idx_seguimiento_reporte (reporte_id, fecha)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------------------------------
+-- Solicitudes de insumos: el estudiante o docente pide una cantidad y el auxiliar la aprueba (se descuenta
+-- del inventario) o la rechaza. cantidad_equivalente = lo pedido convertido a la unidad del insumo.
+-- -----------------------------------------------------------------------------------------------------
+CREATE TABLE solicitudes_insumo (
+  id                    BIGINT         NOT NULL AUTO_INCREMENT,
+  codigo                VARCHAR(20)    NOT NULL,
+  sede_id               BIGINT         NOT NULL,
+  equipo_id             BIGINT         NOT NULL COMMENT 'El insumo (equipos.tipo = INSUMO)',
+  solicitante_id        BIGINT         NOT NULL,
+  cantidad              DECIMAL(14,3)  NOT NULL,
+  unidad                VARCHAR(10)    NOT NULL,
+  cantidad_equivalente  DECIMAL(14,3)  NOT NULL,
+  motivo                VARCHAR(300)   NOT NULL,
+  asignatura            VARCHAR(120)   NULL,
+  estado                VARCHAR(12)    NOT NULL DEFAULT 'PENDIENTE',
+  creado_en             DATETIME(6)    NOT NULL,
+  resuelto_en           DATETIME(6)    NULL,
+  resuelto_por          VARCHAR(120)   NULL,
+  respuesta             VARCHAR(300)   NULL,
+  CONSTRAINT pk_solicitudes_insumo     PRIMARY KEY (id),
+  CONSTRAINT uk_solicitudes_codigo     UNIQUE (codigo),
+  CONSTRAINT fk_solicitud_sede         FOREIGN KEY (sede_id)        REFERENCES sedes (id),
+  CONSTRAINT fk_solicitud_insumo       FOREIGN KEY (equipo_id)      REFERENCES equipos (id),
+  CONSTRAINT fk_solicitud_solicitante  FOREIGN KEY (solicitante_id) REFERENCES usuarios (id),
+  CONSTRAINT ck_solicitud_cantidad     CHECK (cantidad > 0 AND cantidad_equivalente > 0),
+  CONSTRAINT ck_solicitud_unidad       CHECK (unidad IN ('UNIDAD', 'ML', 'L', 'MG', 'G', 'KG', 'CM', 'M')),
+  CONSTRAINT ck_solicitud_estado       CHECK (estado IN ('PENDIENTE', 'APROBADA', 'RECHAZADA', 'CANCELADA')),
+  INDEX idx_solicitud_sede_estado (sede_id, estado, creado_en),
+  INDEX idx_solicitud_solicitante (solicitante_id, creado_en)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;

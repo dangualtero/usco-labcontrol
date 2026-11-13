@@ -4,7 +4,7 @@ import { api } from '../../api/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useSede } from '../../context/SedeContext.jsx'
 import { useDatos } from '../../lib/hooks.js'
-import { CATEGORIAS_PRESUPUESTO, REGEX_PLACA, norm, pesos } from '../../lib/constantes.js'
+import { CATEGORIAS_PRESUPUESTO, REGEX_PLACA_INVENTARIO, norm, pesos } from '../../lib/constantes.js'
 import { Campo, Cargando, ErrorCaja, Kpi, Modal } from '../../components/ui.jsx'
 
 const hoyIso = () => {
@@ -54,7 +54,7 @@ export default function Presupuesto() {
     if (!nuevo.fecha) er.fecha = 'Indica la fecha'
     else if (nuevo.fecha > hoyIso()) er.fecha = 'La fecha no puede ser futura'
     const placa = nuevo.placa.trim().toUpperCase()
-    if (placa && !REGEX_PLACA.test(placa)) er.placa = 'Formato USCO-EQ-000'
+    if (placa && !REGEX_PLACA_INVENTARIO.test(placa)) er.placa = 'Formato USCO-EQ-000 (equipo) o USCO-IN-000 (insumo)'
     setErrores(er)
     if (Object.keys(er).length) return
     setEnviando(true); setErrorSrv('')
@@ -111,7 +111,7 @@ export default function Presupuesto() {
                 </div>
                 <label className="flex items-center gap-2 text-sm text-pizarra"><input type="checkbox" checked={verAnulados} onChange={(e) => setVerAnulados(e.target.checked)} className="h-4 w-4" /> Mostrar movimientos anulados</label>
               </div>
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full min-w-[720px]">
                   <thead><tr><th className="th">Fecha</th><th className="th">Concepto</th><th className="th">Categoría</th><th className="th text-right">Valor</th><th className="th"><span className="sr-only">Acciones</span></th></tr></thead>
                   <tbody>

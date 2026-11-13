@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, FileSearch, Lock, Search } from 'lucide-react'
 import { api } from '../../api/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
-import { useDatos } from '../../lib/hooks.js'
-import { LABORATORIOS } from '../../lib/constantes.js'
+import { useDatos, useLaboratorios } from '../../lib/hooks.js'
 import { fmtFechaHora, toDia } from '../../lib/fecha.js'
 import { descargarTexto } from '../../lib/descarga.js'
 import { Cargando, ErrorCaja, Vacio } from '../../components/ui.jsx'
@@ -25,6 +24,7 @@ export default function HistorialInmutable() {
   const toast = useToast()
   const [f, setF] = useState({ desde: toDia(haceDias(29)), hasta: toDia(new Date()), laboratorio: 'todos', q: '' })
   const [pag, setPag] = useState(0)
+  const labs = useLaboratorios()
   const { datos, error } = useDatos(() => api.historial(f), [f.desde, f.hasta, f.laboratorio, f.q], { cada: 10000 })
 
   const set = (k, v) => { setF((x) => ({ ...x, [k]: v })); setPag(0) }
@@ -55,7 +55,7 @@ export default function HistorialInmutable() {
         <div><label htmlFor="f-h" className="label">Hasta</label><input id="f-h" type="date" className="input" value={f.hasta} min={f.desde} onChange={(e) => set('hasta', e.target.value)} /></div>
         <div><label htmlFor="f-l" className="label">Laboratorio</label>
           <select id="f-l" className="input" value={f.laboratorio} onChange={(e) => set('laboratorio', e.target.value)}>
-            <option value="todos">Todos</option>{LABORATORIOS.map((l) => <option key={l}>{l}</option>)}
+            <option value="todos">Todos</option>{labs.map((l) => <option key={l}>{l}</option>)}
           </select></div>
         <div><label htmlFor="f-q" className="label">Buscar</label>
           <div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-pizarra" aria-hidden="true" />

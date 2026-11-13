@@ -19,8 +19,20 @@ public class ReporteNovedad {
         public String texto() { return texto; }
     }
 
-    /** PENDIENTE → ENVIADA_IA (n8n) | ENVIADA_PLANTILLA (respaldo SMTP) | SIN_CONFIGURAR | FALLIDA */
-    public enum Notificacion { PENDIENTE, ENVIADA_IA, ENVIADA_PLANTILLA, SIN_CONFIGURAR, FALLIDA }
+    /**
+     * PENDIENTE → ENVIADA_IA (n8n) | ENVIADA_PLANTILLA (respaldo SMTP) | SIN_CONFIGURAR | FALLIDA.
+     * Solo la prioridad ALTA se envía al instante; MEDIA y BAJA quedan en PENDIENTE_RESUMEN y salen en el
+     * resumen diario (ENVIADA_RESUMEN).
+     */
+    public enum Notificacion { PENDIENTE, ENVIADA_IA, ENVIADA_PLANTILLA, SIN_CONFIGURAR, FALLIDA, PENDIENTE_RESUMEN, ENVIADA_RESUMEN }
+
+    /** Seguimiento del reporte. */
+    public enum Estado {
+        ABIERTO("Abierto"), EN_PROCESO("En proceso"), RESUELTO("Resuelto");
+        private final String texto;
+        Estado(String texto) { this.texto = texto; }
+        public String texto() { return texto; }
+    }
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -49,6 +61,10 @@ public class ReporteNovedad {
     private LocalDateTime notificadoEn;
     private int intentosNotificacion;
 
+    // ---- Seguimiento ----
+    @Enumerated(EnumType.STRING) private Estado estado = Estado.ABIERTO;
+    private LocalDateTime actualizadoEn;
+
     protected ReporteNovedad() {}
 
     public ReporteNovedad(Sede sede, Equipo equipo, Tipo tipo, String descripcion, String reportadoPor, String reportadoPorCorreo,
@@ -63,6 +79,20 @@ public class ReporteNovedad {
         this.accionSugerida = corta(accion, 600); this.notificacionDetalle = corta(detalle, 300); this.destinatario = destinatario;
         this.notificadoEn = cuando; this.intentosNotificacion++;
     }
+
+    /** MEDIA o BAJA: no se envía ahora; va en el resumen diario. */
+    public void paraResumen(String prioridad, String asunto, String resumen, String accion, String detalle, String destinatario) {
+        this.notificacion = Notificacion.PENDIENTE_RESUMEN; this.prioridad = prioridad; this.asuntoCorreo = corta(asunto, 200);
+        this.resumenIa = corta(resumen, 1000); this.accionSugerida = corta(accion, 600); this.notificacionDetalle = corta(detalle, 300);
+        this.destinatario = destinatario; this.intentosNotificacion++;
+    }
+
+    public void incluidoEnResumen(String destinatario, LocalDateTime cuando) {
+        this.notificacion = Notificacion.ENVIADA_RESUMEN; this.destinatario = destinatario; this.notificadoEn = cuando;
+        this.notificacionDetalle = "Incluido en el resumen diario";
+    }
+
+    public void cambiarEstado(Estado nuevo, LocalDateTime cuando) { this.estado = nuevo; this.actualizadoEn = cuando; }
 
     public void reintentando() { this.notificacion = Notificacion.PENDIENTE; this.notificacionDetalle = "Reenvío solicitado"; }
 
@@ -86,4 +116,6 @@ public class ReporteNovedad {
     public String getDestinatario() { return destinatario; }
     public LocalDateTime getNotificadoEn() { return notificadoEn; }
     public int getIntentosNotificacion() { return intentosNotificacion; }
+    public Estado getEstado() { return estado == null ? Estado.ABIERTO : estado; }
+    public LocalDateTime getActualizadoEn() { return actualizadoEn; }
 }

@@ -42,6 +42,8 @@ async function pedir(metodo, ruta, { cuerpo, params, texto, form } = {}) {
         ...(cuerpo !== undefined ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(sede ? { 'X-Sede': sede } : {}),
+        // Evita que el túnel gratuito de ngrok responda con su página de aviso en lugar de los datos
+        'ngrok-skip-browser-warning': '1',
       },
       // FormData: el navegador pone el Content-Type multipart con su boundary
       body: form ?? (cuerpo !== undefined ? JSON.stringify(cuerpo) : undefined),
@@ -84,13 +86,18 @@ export const api = {
   reenviarCodigo: (correo) => post('/auth/registro/reenviar', { correo }),
 
   // Catálogo
-  equipos: (f = {}) => get('/equipos', { laboratorio: todos(f.laboratorio), categoria: todos(f.categoria), q: f.q }),
+  equipos: (f = {}) => get('/equipos', { laboratorio: todos(f.laboratorio), categoria: todos(f.categoria), q: f.q, tipo: todos(f.tipo) }),
+  laboratoriosSede: () => get('/equipos/laboratorios'),
   equipoDetalle: (placa) => get(`/equipos/${encodeURIComponent(placa)}`),
 
   // Estudiante / Docente
   reservar: (r) => post('/prestamos/reservas', r),
   cancelarReserva: (id) => pedir('DELETE', `/prestamos/reservas/${id}`),
   misPrestamos: () => get('/prestamos/mis'),
+  // Insumos: se piden por cantidad y el auxiliar aprueba o rechaza
+  solicitarInsumo: (placa, r) => post(`/prestamos/insumos/${encodeURIComponent(placa)}/solicitudes`, r),
+  misInsumos: () => get('/prestamos/insumos/mis'),
+  cancelarInsumo: (id) => pedir('DELETE', `/prestamos/insumos/solicitudes/${id}`),
 
   // Auxiliar (ventanilla)
   panel: () => get('/ventanilla/panel'),
@@ -104,6 +111,12 @@ export const api = {
   // Novedades (agotado, dañado, perdido…): avisan al correo institucional mediante el agente de IA de n8n
   reportarNovedad: (placa, r) => post(`/ventanilla/equipos/${encodeURIComponent(placa)}/novedades`, r),
   novedadesAux: () => get('/ventanilla/novedades'),
+  seguimientoAux: (id) => get(`/ventanilla/novedades/${id}/seguimiento`),
+  seguirAux: (id, r) => post(`/ventanilla/novedades/${id}/seguimiento`, r),
+  solicitudesInsumoAux: () => get('/ventanilla/insumos/solicitudes'),
+  aprobarInsumo: (id, respuesta) => post(`/ventanilla/insumos/solicitudes/${id}/aprobar`, { respuesta }),
+  rechazarInsumo: (id, respuesta) => post(`/ventanilla/insumos/solicitudes/${id}/rechazar`, { respuesta }),
+  alertasAux: () => get('/ventanilla/alertas'),
 
   // Coordinador
   kpis: (f = {}) => get('/coordinador/kpis', f),
@@ -133,7 +146,20 @@ export const api = {
 
   // Coordinador · novedades reportadas por los auxiliares
   novedadesCoord: () => get('/coordinador/novedades'),
-  reenviarNovedad: (id) => post(`/coordinador/novedades/${id}/reenviar`),
+  reportesTodos: () => get('/coordinador/novedades/todas'),
+  reportesVersion: () => get('/coordinador/novedades/version'),
+  reenviarNovedad: (id, ahora = false) => pedir('POST', `/coordinador/novedades/${id}/reenviar`, { cuerpo: {}, params: ahora ? { ahora: true } : undefined }),
+  seguimientoCoord: (id) => get(`/coordinador/novedades/${id}/seguimiento`),
+  seguirCoord: (id, r) => post(`/coordinador/novedades/${id}/seguimiento`, r),
+  enviarResumen: () => post('/coordinador/novedades/resumen'),
+  alertasCoord: () => get('/coordinador/alertas'),
+  solicitudesInsumoCoord: () => get('/coordinador/insumos/solicitudes'),
+
+  // Coordinador · laboratorios de la sede abierta
+  laboratorios: () => get('/coordinador/laboratorios'),
+  crearLaboratorio: (r) => post('/coordinador/laboratorios', r),
+  actualizarLaboratorio: (id, r) => put(`/coordinador/laboratorios/${id}`, r),
+  activarLaboratorio: (id, activo) => put(`/coordinador/laboratorios/${id}/activo`, { activo }),
 
   // Coordinador · fotografías desde el computador o el celular
   subirImagen: (archivo) => {

@@ -26,7 +26,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Envía el aviso de cada novedad al correo institucional.
+ * Envía el aviso de cada novedad al correo institucional. Solo la prioridad ALTA se envía al instante; MEDIA y BAJA
+ * se acumulan para el resumen diario.
  *
  * <ol>
  *   <li><b>Agente de IA en n8n</b> (si {@code N8N_WEBHOOK_URL} está definido): el backend le manda el reporte en JSON;
@@ -69,24 +70,37 @@ public class NotificadorNovedades {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void alRegistrar(NovedadService.NovedadRegistrada ev) {
-        try { notificar(ev.id()); }
+        try { notificar(ev.id(), ev.forzar()); }
         catch (Exception e) { log.error("No se pudo notificar la novedad {}", ev.id(), e); }
     }
 
-    void notificar(Long id) {
+    void notificar(Long id) { notificar(id, false); }
+
+    /**
+     * Política de correo: solo la prioridad ALTA se envía al instante. MEDIA y BAJA quedan en PENDIENTE_RESUMEN y
+     * salen en el resumen diario ({@link ResumenDiarioService}). forzar = enviar ya, sea cual sea la prioridad.
+     */
+    void notificar(Long id, boolean forzar) {
         Map<String, Object> payload = tx.execute(s -> reportes.findById(id).map(this::payload).orElse(null));
         if (payload == null) return;
+        payload.put("forzarCorreo", forzar);
 
         String errorN8n = null;
         if (!webhook.isEmpty()) {
             try {
                 JsonNode r = llamarN8n(payload);
                 String prioridad = prioridad(r.path("prioridad").asText(null));
-                boolean enviado = !r.has("correoEnviado") || r.path("correoEnviado").asBoolean(true);
-                guardar(id, enviado ? Notificacion.ENVIADA_IA : Notificacion.FALLIDA, prioridad,
-                        texto(r, "asunto"), texto(r, "resumen"), texto(r, "accionSugerida"),
-                        enviado ? "Aviso redactado y priorizado por el agente de IA (n8n)" : "n8n respondió pero no pudo enviar el correo");
-                if (enviado) return;
+                if (prioridad == null) prioridad = prioridadPorReglas((String) payload.get("tipo"));
+                boolean enviado = r.has("correoEnviado") ? r.path("correoEnviado").asBoolean(false) : "ALTA".equals(prioridad) || forzar;
+                String asunto = texto(r, "asunto"), resumen = texto(r, "resumen"), accion = texto(r, "accionSugerida");
+                if (enviado) {
+                    guardar(id, Notificacion.ENVIADA_IA, prioridad, asunto, resumen, accion, "Aviso redactado, priorizado y enviado por el agente de IA (n8n)");
+                    return;
+                }
+                if (!"ALTA".equals(prioridad) && !forzar) {
+                    paraResumen(id, prioridad, asunto, resumen, accion, "Prioridad " + prioridad + " (IA): irá en el resumen diario");
+                    return;
+                }
                 errorN8n = "n8n no pudo enviar el correo";
             } catch (Exception e) {
                 errorN8n = "n8n no respondió (" + e.getClass().getSimpleName() + (e.getMessage() == null ? "" : ": " + e.getMessage()) + ")";
@@ -98,15 +112,22 @@ public class NotificadorNovedades {
         String prioridad = prioridadPorReglas((String) payload.get("tipo"));
         @SuppressWarnings("unchecked") Map<String, Object> eq = (Map<String, Object>) payload.get("equipo");
         String asunto = "[" + prioridad + "] Novedad en " + eq.get("placa") + " · " + payload.get("tipoTexto") + " · " + ((Map<?, ?>) payload.get("sede")).get("nombre");
+        String base = errorN8n == null ? "" : errorN8n + ". ";
+        if (!"ALTA".equals(prioridad) && !forzar) {
+            paraResumen(id, prioridad, asunto, null, null, base + "Prioridad " + prioridad + " (por reglas): irá en el resumen diario");
+            return;
+        }
         try {
             boolean enviado = correo.enviar(destino, asunto, textoPlantilla(payload, prioridad), null);
-            String base = errorN8n == null ? "" : errorN8n + ". ";
             guardar(id, enviado ? Notificacion.ENVIADA_PLANTILLA : Notificacion.SIN_CONFIGURAR, prioridad, asunto, null, null,
                     enviado ? base + "Se envió el aviso con plantilla" : base + "Correo sin configurar (MAIL_HOST): el aviso quedó en la consola del backend");
         } catch (IllegalStateException e) {
-            guardar(id, Notificacion.FALLIDA, prioridad, asunto, null, null,
-                    (errorN8n == null ? "" : errorN8n + ". ") + "El servidor de correo falló: " + e.getMessage());
+            guardar(id, Notificacion.FALLIDA, prioridad, asunto, null, null, base + "El servidor de correo falló: " + e.getMessage());
         }
+    }
+
+    private void paraResumen(Long id, String prioridad, String asunto, String resumen, String accion, String detalle) {
+        tx.executeWithoutResult(s -> reportes.findById(id).ifPresent(r -> r.paraResumen(prioridad, asunto, resumen, accion, detalle, destino)));
     }
 
     private JsonNode llamarN8n(Map<String, Object> payload) throws Exception {
@@ -155,7 +176,8 @@ public class NotificadorNovedades {
         p.put("sede", sede);
         p.put("equipo", equipo);
         p.put("destinatario", destino);
-        p.put("enlace", appUrl + "/" + n.getSede().getSlug() + "/coordinador/inventario");
+        p.put("enlace", appUrl + "/" + n.getSede().getSlug() + "/coordinador/reportes");
+        p.put("politicaCorreo", "Solo la prioridad ALTA se envía al instante; MEDIA y BAJA van en el resumen diario");
         return p;
     }
 
@@ -176,7 +198,7 @@ public class NotificadorNovedades {
                 Descripción del auxiliar:
                 %s
 
-                Ver inventario: %s
+                Ver reportes: %s
                 """.formatted(prioridad, ((Map<?, ?>) p.get("sede")).get("nombre"), eq.get("placa"), eq.get("nombre"), eq.get("laboratorio"),
                 eq.get("ubicacion") == null ? "" : " · " + eq.get("ubicacion"), p.get("tipoTexto"), p.get("reportadoPor"), p.get("fechaTexto"),
                 Boolean.TRUE.equals(p.get("enviadoAMantenimiento")) ? "sí, se retiró del préstamo" : "no", p.get("descripcion"), p.get("enlace"));

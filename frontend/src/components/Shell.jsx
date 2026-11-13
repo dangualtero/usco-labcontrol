@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import {
   BookOpenCheck, CalendarClock, ClipboardList, History, KeyRound, LayoutDashboard, LogOut, Menu, Package, Repeat2,
   ShieldCheck, TimerReset, UserRound, Users, X, GraduationCap, ClipboardCheck, Wallet, Building2, MapPin,
+  BellRing, Siren, FlaskConical, Beaker,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { Modal } from './ui.jsx'
@@ -20,16 +21,22 @@ const NAV = {
   ],
   AUXILIAR: [
     { to: '/auxiliar', texto: 'Ventanilla', icono: ClipboardList, fin: true },
+    { to: '/auxiliar/insumos', texto: 'Insumos', icono: Beaker },
     { to: '/auxiliar/inventario', texto: 'Inventario', icono: Package },
+    { to: '/auxiliar/reportes', texto: 'Reportes', icono: BellRing },
+    { to: '/auxiliar/alertas', texto: 'Alertas', icono: Siren },
     { to: '/auxiliar/turno', texto: 'Cierre de turno', icono: Repeat2 },
   ],
   COORDINADOR: [
     { to: '/coordinador', texto: 'Dashboard', icono: LayoutDashboard, fin: true },
-    { to: '/coordinador/historial', texto: 'Historial', icono: History },
+    { to: '/coordinador/reportes', texto: 'Reportes', icono: BellRing },
+    { to: '/coordinador/alertas', texto: 'Alertas', icono: Siren },
     { to: '/coordinador/inventario', texto: 'Inventario', icono: Package },
+    { to: '/coordinador/laboratorios', texto: 'Laboratorios', icono: FlaskConical },
     { to: '/coordinador/usuarios', texto: 'Usuarios', icono: Users },
     { to: '/coordinador/presupuesto', texto: 'Presupuesto', icono: Wallet },
     { to: '/coordinador/sedes', texto: 'Sedes', icono: Building2 },
+    { to: '/coordinador/historial', texto: 'Historial', icono: History },
   ],
 }
 const ICONO_ROL = { USUARIO: GraduationCap, AUXILIAR: ClipboardCheck, COORDINADOR: ShieldCheck }
@@ -57,7 +64,7 @@ function BarraSuperior() {
 export function LogoUsco({ to, className = 'h-11' }) {
   return (
     <Link to={to} aria-label="Universidad Surcolombiana, Acreditada de Alta Calidad. Ir al panel principal" className="flex shrink-0 items-center rounded-md">
-      <img src="/logo-usco.png" alt="" className={`${className} w-auto`} />
+      <img src="/logo-usco.webp" width="481" height="128" alt="" className={`${className} w-auto`} />
     </Link>
   )
 }
@@ -135,13 +142,13 @@ export default function Shell() {
         {/* Navegación: pestañas en escritorio, menú hamburguesa desplegable en móvil (PA-02) */}
         <div className="border-b-4 border-oro-claro bg-usco-dark">
           <nav id="menu-principal" aria-label="Navegación principal" className="mx-auto max-w-7xl px-2 sm:px-6">
-            <ul className={`${menu ? 'flex' : 'hidden'} flex-col py-2 md:flex md:flex-row md:gap-1 md:py-0`}>
+            <ul className={`${menu ? 'flex' : 'hidden'} flex-col py-2 md:flex md:flex-row md:flex-wrap md:gap-0 md:py-0`}>
               <li className="px-3 pb-2 text-xs text-oro-claro md:hidden">{usuario?.nombre} · {GRUPOS[grupo]?.etiqueta} · {sede?.nombre}</li>
               {grupo === 'COORDINADOR' && <li className="px-3 pb-2 md:hidden"><SelectorSede /></li>}
               {items.map(({ to, texto, icono: Ic, fin }) => (
                 <li key={to}>
                   <NavLink to={ruta(to)} end={fin} onClick={() => setMenu(false)}
-                    className={({ isActive }) => `flex min-h-[48px] items-center gap-2 px-4 text-sm font-bold transition-colors md:border-b-4 md:-mb-1 ${isActive ? 'bg-white/10 text-white md:border-oro-claro' : 'text-white/80 hover:bg-white/5 hover:text-white md:border-transparent'}`}>
+                    className={({ isActive }) => `flex min-h-[48px] items-center gap-2 whitespace-nowrap px-4 text-sm font-bold transition-colors md:border-b-4 md:-mb-1 md:px-3 xl:px-3.5 ${isActive ? 'bg-white/10 text-white md:border-oro-claro' : 'text-white/80 hover:bg-white/5 hover:text-white md:border-transparent'}`}>
                     <Ic className="h-4 w-4" aria-hidden="true" /> {texto}
                   </NavLink>
                 </li>
@@ -158,7 +165,7 @@ export default function Shell() {
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-4 text-xs text-pizarra sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p>© 2026 Universidad Surcolombiana · Facultad de Ingeniería · Programa de Ingeniería de Software · {sede?.nombre ?? 'Sede Neiva'}, Huila</p>
-          <p>USCO LabControl v1.1.0 · Tratamiento de datos personales conforme a la Ley 1581 de 2012</p>
+          <p>USCO LabControl v1.4.0 · Tratamiento de datos personales conforme a la Ley 1581 de 2012</p>
         </div>
       </footer>
 

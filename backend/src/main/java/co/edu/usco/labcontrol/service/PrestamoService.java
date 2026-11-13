@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PrestamoService {
     public static final Pattern FORMATO_PLACA = Pattern.compile("^USCO-EQ-\\d{3}$");
+    static final String MSG_INSUMO = "Los insumos no se prestan: se solicitan por cantidad en la pestaña «Insumos» del catálogo";
     private static final String MSG_NO_EXISTE = "El equipo no existe en el inventario activo";
     private static final String MSG_LIMITE = "Límite máximo de equipos alcanzado";
     private static final Set<EstadoPrestamo> VIGENTES = Set.of(EstadoPrestamo.RESERVADO, EstadoPrestamo.ACTIVO);
@@ -57,6 +58,7 @@ public class PrestamoService {
 
         Equipo e = equipos.findActivoForUpdate(r.placa()).filter(x -> sedes.pertenece(x, sedes.de(u)))
                 .orElseThrow(() -> ApiException.notFound(MSG_NO_EXISTE));
+        if (e.esInsumo()) throw ApiException.conflict(MSG_INSUMO);
         if (e.getEstado() != EstadoEquipo.DISPONIBLE) throw ApiException.conflict("No disponible");
         if (prestamos.countBySolicitanteIdAndEstadoIn(u.getId(), VIGENTES) >= limite) throw ApiException.conflict(MSG_LIMITE);
         if (!prestamos.traslapes(e.getId(), r.inicio(), r.fin()).isEmpty()) {
@@ -96,7 +98,7 @@ public class PrestamoService {
                 .filter(p -> sedes.pertenece(p.getEquipo(), sede)).map(mapper::prestamo).toList();
         List<PrestamoDto> reservas = prestamos.findByEstadoOrderByFranjaInicioAsc(EstadoPrestamo.RESERVADO).stream()
                 .filter(p -> sedes.pertenece(p.getEquipo(), sede)).map(mapper::prestamo).toList();
-        var lista = equipos.findBySedeIdAndActivoTrueOrderByLaboratorioAscPlacaAsc(sede.getId());
+        var lista = equipos.findBySedeIdAndActivoTrueOrderByLaboratorioAscPlacaAsc(sede.getId()).stream().filter(e -> !e.esInsumo()).toList();
         long disp = lista.stream().filter(e -> e.getEstado() == EstadoEquipo.DISPONIBLE).count();
         long pres = lista.stream().filter(e -> e.getEstado() == EstadoEquipo.PRESTADO).count();
         long mant = lista.stream().filter(e -> e.getEstado() == EstadoEquipo.MANTENIMIENTO).count();
@@ -142,6 +144,7 @@ public class PrestamoService {
     public PrestamoDto salida(Long auxiliarId, SalidaRequest r) {
         Usuario aux = usuarios.findById(auxiliarId).orElseThrow(() -> ApiException.notFound("Auxiliar no encontrado"));
         String placa = r.placa() == null ? "" : r.placa().trim().toUpperCase();
+        if (placa.startsWith(TipoElemento.INSUMO.prefijo())) throw ApiException.badRequest(MSG_INSUMO);
         if (!FORMATO_PLACA.matcher(placa).matches()) {
             throw ApiException.badRequest("Usa el formato USCO-EQ-000. Ejemplo: USCO-EQ-102");
         }

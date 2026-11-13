@@ -6,15 +6,18 @@ Cuando un auxiliar reporta que un equipo se **agotó, se dañó, se perdió o fa
 Auxiliar → «Reportar novedad» → API LabControl (guarda el reporte)
               │ en segundo plano
               ▼
-        Webhook de n8n ──► Agente de IA (Claude) ──► Interpretar respuesta ──► Enviar correo ──► Responder a LabControl
-                             prioridad ALTA/MEDIA/BAJA,  (valida el JSON;        (SMTP al            (prioridad, asunto,
-                             asunto, resumen y            si la IA falla usa      correo              resumen, acción)
-                             acción sugerida              reglas)                 institucional)
+        Webhook ──► Agente de IA ──► Interpretar ──► ¿Prioridad ALTA? ──sí──► Enviar correo ──► Responder a LabControl
+                    (prioriza y        respuesta              │
+                     redacta)                                 └──no───► Responder sin correo (va al resumen diario)
 ```
 
-La respuesta queda guardada en el reporte, y el coordinador la ve en **Inventario → Novedades reportadas**.
+**Política de correo:** solo los reportes de prioridad **ALTA** se envían al instante. Los de prioridad **MEDIA** y **BAJA**
+no se envían en ese momento: el backend los guarda como «Irá en el resumen diario» y los manda todos juntos en el
+**resumen diario** (7:00 a. m.), junto con los insumos agotados o con 25 % o menos.
 
-Si n8n está apagado o no responde, el backend **igual envía el aviso** con una plantilla y una prioridad calculada por reglas. Así ninguna novedad se pierde.
+La respuesta queda guardada en el reporte y el coordinador la ve en **Reportes** (en tiempo real y con seguimiento).
+
+Si n8n está apagado o no responde, el backend calcula la prioridad por reglas (perdido o dañado = ALTA): si es ALTA **igual envía el aviso** con una plantilla, y si no, lo deja para el resumen diario. Así ninguna novedad se pierde.
 
 ## 1. Ejecutar n8n
 
@@ -40,7 +43,27 @@ Abre `http://localhost:5678` y crea tu cuenta de administrador de n8n.
 2. En el menú **⋯** (arriba a la derecha) elige **Import from File**.
 3. Selecciona `n8n/labcontrol-novedades.json`.
 
-El flujo se probó contra las definiciones de nodos de **n8n 2.46**. Si usas otra versión y algún nodo aparece con advertencia, ábrelo y vuelve a elegir sus opciones.
+El flujo usa versiones de nodos disponibles desde **n8n 2.22** (también funciona en versiones más nuevas). Si usas otra versión y algún nodo aparece con advertencia, ábrelo y vuelve a elegir sus opciones.
+
+### ¿Ya tenías el flujo importado (por ejemplo con Gemini)? Agrega el nodo «¿Prioridad ALTA?» a mano
+
+No hace falta volver a importar (perderías tu modelo Gemini). En tu flujo actual:
+
+1. Borra la flecha que va de **Interpretar respuesta de la IA** a **Enviar correo institucional**.
+2. Agrega un nodo **If** y llámalo `¿Prioridad ALTA?`. Conecta **Interpretar respuesta de la IA → ¿Prioridad ALTA?**.
+3. En la condición elige **Boolean → is true** y en el valor pega esta expresión:
+   ```
+   {{ $json.prioridad === 'ALTA' || $('Webhook LabControl').first().json.body.forzarCorreo === true }}
+   ```
+4. Conecta la salida **true** a **Enviar correo institucional** (que sigue conectado a **Responder a LabControl**).
+5. Duplica el nodo **Responder a LabControl**, llámalo `Responder sin correo`, conéctalo a la salida **false** y en su
+   *Response Body* cambia `correoEnviado: !$json.error` por `correoEnviado: false`.
+6. Guarda y publica el flujo.
+
+`forzarCorreo` llega en `true` cuando el coordinador pulsa **Enviar correo ahora** en un reporte que no es ALTA.
+
+Si no haces este cambio, el sistema sigue funcionando: n8n enviaría todos los correos al instante como antes y el
+backend lo registra así.
 
 ## 3. Credenciales (una por nodo)
 
@@ -65,7 +88,7 @@ El destinatario **no** se configura en n8n: lo envía el backend (`LABCONTROL_AL
 
 ## Qué decide la IA
 
-El mensaje de sistema del nodo **Agente de IA** define los criterios, y puedes ajustarlos ahí mismo:
+El mensaje de sistema del nodo **Agente de IA** define los criterios, y puedes ajustarlos ahí mismo (recuerda que solo ALTA se envía al instante):
 
 - **ALTA:** equipo perdido; daño que impide usarlo o que representa un riesgo; equipo único o costoso; afecta clases inmediatas.
 - **MEDIA:** falla parcial o equipo agotado que requiere reposición.

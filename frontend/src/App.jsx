@@ -19,6 +19,11 @@ import Usuarios from './pages/coordinador/Usuarios.jsx'
 import Presupuesto from './pages/coordinador/Presupuesto.jsx'
 import Sedes from './pages/coordinador/Sedes.jsx'
 import InventarioAux from './pages/auxiliar/InventarioAux.jsx'
+import SolicitudesInsumo from './pages/auxiliar/SolicitudesInsumo.jsx'
+import Laboratorios from './pages/coordinador/Laboratorios.jsx'
+import Alertas from './pages/compartido/Alertas.jsx'
+import Reportes from './pages/compartido/Reportes.jsx'
+import { api } from './api/index.js'
 import ConexionBanner from './components/ConexionBanner.jsx'
 
 const REQUERIDO = {
@@ -67,6 +72,14 @@ function RequiereRol({ grupo }) {
   )
 }
 
+// Vistas compartidas, configuradas para cada rol
+const AlertasAux = () => <Alertas cargar={api.alertasAux} enlaces={{ SOLICITUD_PENDIENTE: '/auxiliar/insumos', NOVEDAD: '/auxiliar/reportes', PRESTAMO_VENCIDO: '/auxiliar', AGOTADO: '/auxiliar/inventario', STOCK_BAJO: '/auxiliar/inventario', MANTENIMIENTO: '/auxiliar/inventario' }} />
+const AlertasCoord = () => <Alertas cargar={api.alertasCoord} enlaces={{ NOVEDAD: '/coordinador/reportes', AGOTADO: '/coordinador/inventario', STOCK_BAJO: '/coordinador/inventario', MANTENIMIENTO: '/coordinador/inventario', PRESTAMO_VENCIDO: '/coordinador/historial', SOLICITUD_PENDIENTE: '/coordinador/insumos' }} />
+const ReportesAux = () => <Reportes cargar={api.novedadesAux} seguimiento={api.seguimientoAux} seguir={api.seguirAux} />
+const ReportesCoord = () => <Reportes cargar={api.reportesTodos} version={api.reportesVersion} seguimiento={api.seguimientoCoord} seguir={api.seguirCoord}
+  reenviar={api.reenviarNovedad} enviarResumen={api.enviarResumen} />
+const InsumosCoord = () => <SolicitudesInsumo soloLectura cargar={api.solicitudesInsumoCoord} />
+
 /** /:sede sin más ruta → panel del rol o ingreso de esa sede. */
 function RaizSede() {
   const { usuario } = useAuth()
@@ -101,6 +114,9 @@ export default function App() {
             <Route path="auxiliar" element={<Ventanilla />} />
             <Route path="auxiliar/turno" element={<CierreTurno />} />
             <Route path="auxiliar/inventario" element={<InventarioAux />} />
+            <Route path="auxiliar/insumos" element={<SolicitudesInsumo />} />
+            <Route path="auxiliar/reportes" element={<ReportesAux />} />
+            <Route path="auxiliar/alertas" element={<AlertasAux />} />
           </Route>
           <Route element={<RequiereRol grupo="COORDINADOR" />}>
             <Route path="coordinador" element={<Dashboard />} />
@@ -109,6 +125,10 @@ export default function App() {
             <Route path="coordinador/usuarios" element={<Usuarios />} />
             <Route path="coordinador/presupuesto" element={<Presupuesto />} />
             <Route path="coordinador/sedes" element={<Sedes />} />
+            <Route path="coordinador/reportes" element={<ReportesCoord />} />
+            <Route path="coordinador/alertas" element={<AlertasCoord />} />
+            <Route path="coordinador/laboratorios" element={<Laboratorios />} />
+            <Route path="coordinador/insumos" element={<InsumosCoord />} />
           </Route>
         </Route>
         <Route path="*" element={<RaizSede />} />

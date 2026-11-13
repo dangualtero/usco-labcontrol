@@ -3,7 +3,9 @@ package co.edu.usco.labcontrol;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import co.edu.usco.labcontrol.domain.Laboratorio;
 import co.edu.usco.labcontrol.domain.Sede;
+import co.edu.usco.labcontrol.repo.LaboratorioRepository;
 import co.edu.usco.labcontrol.repo.SedeRepository;
 import co.edu.usco.labcontrol.repo.UsuarioRepository;
 import co.edu.usco.labcontrol.service.*;
@@ -30,6 +32,7 @@ class SedesPresupuestoImagenesTest {
     @Autowired AuthService auth;
     @Autowired UsuarioRepository usuarios;
     @Autowired SedeRepository sedes;
+    @Autowired LaboratorioRepository laboratorios;
 
     Long id(String correo) { return usuarios.findByCorreoIgnoreCase(correo).orElseThrow().getId(); }
 
@@ -63,6 +66,10 @@ class SedesPresupuestoImagenesTest {
             usuariosSrv.crear(coord, new UsuarioRequest("Estudiante Garzón", "est.garzon@usco.edu.co", "ESTUDIANTE", "1099800002", null, null, "Garzon#2026"));
             var u = usuarios.findByCorreoIgnoreCase("est.garzon@usco.edu.co").orElseThrow(); u.setSede(garzon); return usuarios.save(u);
         });
+        // Cada sede tiene sus laboratorios: Garzón necesita el suyo antes de registrar equipos
+        if (laboratorios.findBySedeIdAndNombreIgnoreCase(garzon.getId(), "Electrónica").isEmpty()) {
+            laboratorios.save(new Laboratorio(garzon, "Electrónica", null, null, java.time.LocalDateTime.now()));
+        }
         inventario.crear(aux.getId(), new EquipoRequest("USCO-EQ-900", "Multímetro Garzón", "Fluke", "117", null, "Multímetros", "Electrónica",
                 null, null, null, null, "Bueno", null, "DISPONIBLE"));
 

@@ -12,6 +12,13 @@ USE labcontrol;
 INSERT IGNORE INTO sedes (id, slug, nombre, ciudad, direccion, activa, creada_en) VALUES
   (1, 'neiva', 'Sede Neiva', 'Neiva', 'Av. Pastrana Borrero, Cra. 1', TRUE, NOW(6));
 
+-- ---------------- Laboratorios de la Sede Neiva (el Coordinador puede crear más desde «Laboratorios»)
+INSERT IGNORE INTO laboratorios (sede_id, nombre, ubicacion, descripcion, activo, creado_en) VALUES
+  (1, 'Electrónica', 'Bloque de Ingeniería', 'Instrumentación, circuitos y medidas eléctricas', TRUE, NOW(6)),
+  (1, 'Petróleos',   'Bloque de Ingeniería', 'Análisis de fluidos y propiedades de rocas', TRUE, NOW(6)),
+  (1, 'Civil',       'Bloque de Ingeniería', 'Topografía, suelos y ensayos de materiales', TRUE, NOW(6)),
+  (1, 'Agrícola',    'Sede Neiva',           'Suelos, agua y climatología', TRUE, NOW(6));
+
 -- ---------------- Usuarios (rol, sede y contraseña BCrypt)
 -- El Coordinador es general: sede_id NULL.
 INSERT IGNORE INTO usuarios (nombre, correo, password_hash, rol, documento, codigo_estudiantil, programa, activo, sede_id) VALUES
@@ -128,3 +135,24 @@ INSERT IGNORE INTO equipos (placa, nombre, marca, modelo, numero_serie, categori
    'Equipo retirado del inventario por obsolescencia.',
    'Lectura analógica',
    NULL, 'Deteriorado', '/images/equipos/usco-eq-299.jpg', 'DISPONIBLE', FALSE, 'Obsolescencia técnica; reemplazado por USCO-EQ-200', NOW(6) - INTERVAL 40 DAY, 1);
+
+-- ---------------- Insumos de ejemplo (se consumen: el estudiante pide una cantidad y el auxiliar la aprueba)
+-- cantidad_referencia = 100 %. Se alerta cuando quedan en 25 % o menos (el alcohol arranca en alerta a propósito).
+INSERT IGNORE INTO equipos (placa, nombre, marca, modelo, numero_serie, categoria, laboratorio, ubicacion, descripcion, specs, accesorios,
+                            estado_fisico, foto_url, estado, activo, baja_motivo, baja_fecha, sede_id,
+                            tipo, cantidad, unidad, cantidad_referencia) VALUES
+  ('USCO-IN-001', 'Alcohol isopropílico 99 %', 'Químicos del Huila', NULL, NULL, 'Reactivos', 'Electrónica',
+   'Bloque de Ingeniería · Laboratorio de Electrónica · Gabinete de insumos', 'Limpieza de tarjetas y contactos.', NULL, NULL,
+   'Bueno', NULL, 'DISPONIBLE', TRUE, NULL, NULL, 1, 'INSUMO', 1.000, 'L', 5.000),
+  ('USCO-IN-002', 'Soldadura de estaño 60/40', 'Kester', '0,8 mm', NULL, 'Soldadura', 'Electrónica',
+   'Bloque de Ingeniería · Laboratorio de Electrónica · Gabinete de insumos', 'Carrete para prácticas de soldadura.', NULL, NULL,
+   'Bueno', NULL, 'DISPONIBLE', TRUE, NULL, NULL, 1, 'INSUMO', 450.000, 'G', 500.000),
+  ('USCO-IN-003', 'Cable UTP categoría 6', 'Nexxt', 'Cat 6', NULL, 'Cableado', 'Electrónica',
+   'Bloque de Ingeniería · Laboratorio de Electrónica · Bodega', 'Rollo para prácticas de redes y conexiones.', NULL, NULL,
+   'Bueno', NULL, 'DISPONIBLE', TRUE, NULL, NULL, 1, 'INSUMO', 120.000, 'M', 305.000),
+  ('USCO-IN-004', 'Guantes de nitrilo talla M', 'Steril', NULL, NULL, 'Protección personal', 'Petróleos',
+   'Bloque de Ingeniería · Laboratorio de Petróleos · Gabinete', 'Caja de guantes desechables.', NULL, NULL,
+   'Bueno', NULL, 'DISPONIBLE', TRUE, NULL, NULL, 1, 'INSUMO', 80.000, 'UNIDAD', 100.000),
+  ('USCO-IN-005', 'Cemento gris de uso general', 'Argos', 'Tipo UG', NULL, 'Materiales de construcción', 'Civil',
+   'Bloque de Ingeniería · Laboratorio de Civil · Bodega de materiales', 'Para ensayos de mezclas y cilindros de concreto.', NULL, NULL,
+   'Bueno', NULL, 'DISPONIBLE', TRUE, NULL, NULL, 1, 'INSUMO', 20.000, 'KG', 50.000);

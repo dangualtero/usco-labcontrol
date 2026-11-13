@@ -1,20 +1,32 @@
 import { useMemo, useState } from 'react'
-import { Search, SlidersHorizontal, X, CircleCheck, Clock, Wrench, RefreshCw, ArrowRight, Info, Ban } from 'lucide-react'
+import { Search, SlidersHorizontal, X, CircleCheck, Clock, Wrench, RefreshCw, ArrowRight, Info, Ban, Beaker, Microscope } from 'lucide-react'
 import { api } from '../../api/index.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useDatos, useAhora } from '../../lib/hooks.js'
-import { LABORATORIOS, norm } from '../../lib/constantes.js'
+import { norm } from '../../lib/constantes.js'
 import { Cargando, ErrorCaja, EquipoFoto, EstadoBadge, Vacio, Chip, AlertaRetraso } from '../../components/ui.jsx'
 import FichaEquipo from './FichaEquipo.jsx'
 import SolicitudModal from './SolicitudModal.jsx'
+import SolicitudInsumoModal from './SolicitudInsumoModal.jsx'
+import { Existencias } from '../../components/Existencias.jsx'
+import { FiltroTipo } from '../../components/FiltroTipo.jsx'
+
+const PESTANAS = [
+  { valor: 'EQUIPO', texto: 'Equipos (préstamo)', Icono: Microscope },
+  { valor: 'INSUMO', texto: 'Insumos (por cantidad)', Icono: Beaker },
+]
 
 export default function Catalogo() {
   const { usuario } = useAuth()
   const ahora = useAhora(30000)
-  const { datos: equiposBase, error, actualizado, cargando, recargar } = useDatos(() => api.equipos(), [], { cada: 20000 })
-  // Orden institucional de laboratorios (Electrónica, Petróleos, Civil, Agrícola), luego por placa
+  const { datos: base, error, actualizado, cargando, recargar } = useDatos(() => api.equipos(), [], { cada: 20000 })
+  const [tipo, setTipo] = useState('EQUIPO')
+  // Por laboratorio y luego por placa; solo la pestaña elegida (equipos o insumos)
+  const equiposBase = useMemo(() => base && base.filter((e) => (e.tipo ?? 'EQUIPO') === tipo), [base, tipo])
   const equipos = useMemo(() => equiposBase && [...equiposBase].sort((a, b) =>
-    LABORATORIOS.indexOf(a.laboratorio) - LABORATORIOS.indexOf(b.laboratorio) || a.placa.localeCompare(b.placa)), [equiposBase])
+    a.laboratorio.localeCompare(b.laboratorio) || a.placa.localeCompare(b.placa)), [equiposBase])
+  const laboratorios = useMemo(() => [...new Set((base ?? []).map((e) => e.laboratorio))].sort(), [base])
+  const insumo = tipo === 'INSUMO'
   const { datos: mis } = useDatos(() => api.misPrestamos(), [], { cada: 15000 })
 
   const [q, setQ] = useState('')
@@ -24,6 +36,7 @@ export default function Catalogo() {
   const [sugerir, setSugerir] = useState(false)
   const [ficha, setFicha] = useState(null)
   const [solicitud, setSolicitud] = useState(null)
+  const [pedido, setPedido] = useState(null)
 
   const categorias = useMemo(() => [...new Set((equipos ?? []).filter((e) => lab === 'todos' || e.laboratorio === lab).map((e) => e.categoria))].sort(), [equipos, lab])
 
@@ -31,7 +44,7 @@ export default function Catalogo() {
     const nq = norm(q)
     return (equipos ?? []).filter((e) =>
       (lab === 'todos' || e.laboratorio === lab) && (cat === 'todos' || e.categoria === cat) &&
-      (!soloDisp || e.estado === 'DISPONIBLE') &&
+      (!soloDisp || (e.tipo === 'INSUMO' ? Number(e.cantidad) > 0 : e.estado === 'DISPONIBLE')) &&
       (!nq || norm(`${e.placa} ${e.nombre} ${e.marca} ${e.modelo} ${e.categoria}`).includes(nq)))
   }, [equipos, q, lab, cat, soloDisp])
 
@@ -60,16 +73,18 @@ export default function Catalogo() {
       <section className="card overflow-hidden">
         <div className="bg-gradient-to-r from-usco to-usco-dark px-5 py-5 text-white sm:px-7">
           <p className="text-xs font-bold uppercase tracking-widest text-oro-claro">Hola, {usuario.nombre.split(' ')[0]}</p>
-          <h1 className="mt-1 text-2xl font-extrabold !text-white sm:text-3xl">Encuentra el equipo adecuado para tu práctica</h1>
-          <p className="mt-1 text-sm text-white/85">Consulta qué hay disponible ahora mismo y solicítalo en 3 pasos: Selección → Horario → Confirmar.</p>
+          <h1 className="mt-1 text-2xl font-extrabold !text-white sm:text-3xl">Encuentra el equipo o insumo para tu práctica</h1>
+          <p className="mt-1 text-sm text-white/85">Los equipos se reservan en 3 pasos: Selección → Horario → Confirmar. Los insumos se piden por cantidad y los entrega el auxiliar.</p>
         </div>
 
         <div className="space-y-4 p-4 sm:p-5">
+          <FiltroTipo valor={tipo} onCambio={(t) => { setTipo(t); setCat('todos') }} opciones={PESTANAS} etiqueta="Equipos o insumos"
+            conteo={{ EQUIPO: (base ?? []).filter((e) => e.tipo !== 'INSUMO').length, INSUMO: (base ?? []).filter((e) => e.tipo === 'INSUMO').length }} />
           <div className="relative">
             <label htmlFor="busqueda" className="sr-only">Buscar equipo</label>
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-pizarra" aria-hidden="true" />
             <input id="busqueda" type="search" value={q} onChange={(e) => { setQ(e.target.value); setSugerir(true) }} onFocus={() => setSugerir(true)} onBlur={() => setTimeout(() => setSugerir(false), 150)}
-              placeholder="Buscar por nombre, marca o placa… (ej. Multímetro)" className="input !min-h-[52px] pl-11 pr-11 text-base" autoComplete="off" />
+              placeholder={insumo ? 'Buscar insumo… (ej. Alcohol, cable, guantes)' : 'Buscar por nombre, marca o placa… (ej. Multímetro)'} className="input !min-h-[52px] pl-11 pr-11 text-base" autoComplete="off" />
             {q && <button onClick={() => setQ('')} aria-label="Borrar búsqueda" className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-pizarra hover:bg-slate-100"><X className="h-4 w-4" /></button>}
             {sugerir && sugerencias.length > 0 && (
               <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl" role="listbox" aria-label="Sugerencias">
@@ -87,7 +102,7 @@ export default function Catalogo() {
 
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por laboratorio">
-              {['todos', ...LABORATORIOS].map((l) => (
+              {['todos', ...laboratorios].map((l) => (
                 <button key={l} onClick={() => { setLab(l); setCat('todos') }} aria-pressed={lab === l}
                   className={`min-h-[40px] rounded-full border px-4 text-sm font-bold transition-colors ${lab === l ? 'border-usco bg-usco text-white' : 'border-slate-300 bg-white text-pizarra-oscuro hover:border-usco hover:text-usco'}`}>
                   {l === 'todos' ? 'Todos los laboratorios' : l}
@@ -104,7 +119,7 @@ export default function Catalogo() {
                 </select>
               </div>
               <label className="flex min-h-[40px] cursor-pointer items-center gap-2 text-sm font-semibold text-pizarra-oscuro">
-                <input type="checkbox" checked={soloDisp} onChange={(e) => setSoloDisp(e.target.checked)} className="h-4 w-4 rounded border-slate-300 accent-[#8F141B]" /> Solo disponibles
+                <input type="checkbox" checked={soloDisp} onChange={(e) => setSoloDisp(e.target.checked)} className="h-4 w-4 rounded border-slate-300 accent-[#8F141B]" /> {insumo ? 'Solo con existencias' : 'Solo disponibles'}
               </label>
             </div>
           </div>
@@ -113,9 +128,10 @@ export default function Catalogo() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
         <div className="flex flex-wrap items-center gap-2">
+          {insumo ? <Chip className="!bg-sky-50 !text-sky-900"><Beaker className="h-3.5 w-3.5" aria-hidden="true" /> {(equipos ?? []).length} insumos · {(equipos ?? []).filter((e) => Number(e.cantidad) > 0).length} con existencias</Chip> : <>
           <Chip className="!bg-emerald-50 !text-emerald-800"><CircleCheck className="h-3.5 w-3.5" aria-hidden="true" /> {conteo.DISPONIBLE} disponibles</Chip>
           <Chip className="!bg-amber-50 !text-amber-900"><Clock className="h-3.5 w-3.5" aria-hidden="true" /> {conteo.PRESTADO} prestados</Chip>
-          <Chip><Wrench className="h-3.5 w-3.5" aria-hidden="true" /> {conteo.MANTENIMIENTO} en mantenimiento</Chip>
+          <Chip><Wrench className="h-3.5 w-3.5" aria-hidden="true" /> {conteo.MANTENIMIENTO} en mantenimiento</Chip></>}
         </div>
         <span className="inline-flex items-center gap-2 text-xs font-semibold text-pizarra">
           {actualizado && <span>Última consulta: {actualizado.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>}
@@ -130,7 +146,7 @@ export default function Catalogo() {
 
       {equipos && filtrados.length === 0 && (
         // PV-07 / PU-07: estado vacío claro, sin listado completo debajo
-        <Vacio titulo="No se encontraron equipos" detalle="Prueba con otro término de búsqueda o cambia los filtros de laboratorio y categoría.">
+        <Vacio titulo={insumo ? 'No se encontraron insumos' : 'No se encontraron equipos'} detalle="Prueba con otro término de búsqueda o cambia los filtros de laboratorio y categoría.">
           <button className="btn-outline" onClick={limpiar}>Limpiar filtros</button>
         </Vacio>
       )}
@@ -138,6 +154,25 @@ export default function Catalogo() {
       {filtrados.length > 0 && (
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtrados.map((e) => {
+            if (e.tipo === 'INSUMO') {
+              const hay = Number(e.cantidad) > 0
+              return (
+                <li key={e.placa} className="card group flex flex-col overflow-hidden transition-shadow hover:shadow-lg">
+                  <EquipoFoto equipo={e} className="h-40" />
+                  <div className="flex flex-1 flex-col gap-3 p-4">
+                    <div className="flex items-center justify-between gap-2"><Chip>{e.laboratorio}</Chip><span className="text-xs font-semibold text-pizarra">{e.categoria}</span></div>
+                    <div>
+                      <h3 className="text-[17px] font-extrabold leading-snug">{e.nombre}</h3>
+                      {e.descripcion && <p className="line-clamp-2 text-sm text-pizarra">{e.descripcion}</p>}
+                    </div>
+                    <Existencias equipo={e} />
+                    <button className="btn-primary btn-sm mt-auto" disabled={!hay} onClick={() => setPedido(e)} aria-label={hay ? `Solicitar ${e.nombre}` : `${e.nombre}: agotado`}>
+                      {hay ? <>Solicitar cantidad <ArrowRight className="h-4 w-4" aria-hidden="true" /></> : <><Ban className="h-4 w-4" aria-hidden="true" /> Agotado</>}
+                    </button>
+                  </div>
+                </li>
+              )
+            }
             const libre = e.estado === 'DISPONIBLE'
             return (
               <li key={e.placa} className="card group flex flex-col overflow-hidden transition-shadow hover:shadow-lg">
@@ -170,6 +205,7 @@ export default function Catalogo() {
 
       <FichaEquipo placa={ficha} onCerrar={() => setFicha(null)} onSolicitar={(e) => { setFicha(null); setSolicitud(e) }} />
       <SolicitudModal equipo={solicitud} onCerrar={() => setSolicitud(null)} onCreada={recargar} />
+      <SolicitudInsumoModal insumo={pedido} onCerrar={() => setPedido(null)} onCreada={recargar} />
     </div>
   )
 }

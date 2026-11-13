@@ -73,3 +73,8 @@ labcontrol:
     n8n-webhook-url: ${N8N_WEBHOOK_URL:}
     n8n-token: ${N8N_WEBHOOK_TOKEN:}
     n8n-timeout-segundos: ${N8N_TIMEOUT:90}
+  resumen:
+    # Resumen diario por correo (reportes MEDIA/BAJA + insumos con 25 % o menos). Formato cron de Spring:
+    # segundo minuto hora día mes día-de-semana. Por defecto todos los días a las 7:00 a. m. (hora de Colombia).
+    cron: ${LABCONTROL_RESUMEN_CRON:0 0 7 * * *}
+    zona: ${LABCONTROL_RESUMEN_ZONA:America/Bogota}

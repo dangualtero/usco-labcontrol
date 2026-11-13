@@ -87,7 +87,7 @@ public class PresupuestoService {
         if (fecha.isAfter(hoy)) throw ApiException.badRequest("La fecha no puede ser futura");
         if (fecha.isBefore(hoy.minusYears(5))) throw ApiException.badRequest("La fecha es demasiado antigua");
         String placa = r.placa() == null || r.placa().isBlank() ? null : r.placa().trim().toUpperCase();
-        if (placa != null && !PrestamoService.FORMATO_PLACA.matcher(placa).matches()) throw ApiException.badRequest("Usa el formato USCO-EQ-000 para la placa");
+        if (placa != null && !InventarioService.FORMATO_INVENTARIO.matcher(placa).matches()) throw ApiException.badRequest("Usa el formato USCO-EQ-000 (equipo) o USCO-IN-000 (insumo) para la placa");
 
         if (tipo == Tipo.GASTO) {
             long saldo = saldo(sede);

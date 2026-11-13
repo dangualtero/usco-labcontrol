@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
+import { api } from '../api/index.js'
 
 /**
  * Consulta la API periódicamente y a demanda (botón «Actualizar» / «Reintentar»). Si el servidor responde 401
@@ -45,4 +46,16 @@ export function useAhora(ms = 30000) {
   const [ahora, setAhora] = useState(new Date())
   useEffect(() => { const t = setInterval(() => setAhora(new Date()), ms); return () => clearInterval(t) }, [ms])
   return ahora
+}
+
+/** Laboratorios activos de la sede abierta (cada sede tiene los suyos). Mientras carga devuelve []. */
+export function useLaboratorios(deps = []) {
+  const [labs, setLabs] = useState([])
+  useEffect(() => {
+    let vivo = true
+    api.laboratoriosSede().then((l) => { if (vivo) setLabs(l) }).catch(() => {})
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
+  return labs
 }

@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CoordinadorService {
+    /** Laboratorios con los que arranca la sede principal. Los de cada sede se administran en «Laboratorios». */
     public static final List<String> LABORATORIOS = List.of("Electrónica", "Petróleos", "Civil", "Agrícola");
     private static final String MASCARA = "••••••";
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -24,11 +25,15 @@ public class CoordinadorService {
     private final UsuarioRepository usuarios;
     private final Mapper mapper;
     private final SedeContexto sedes;
+    private final LaboratorioRepository laboratorios;
+    private final ReporteNovedadRepository reportes;
 
     public CoordinadorService(EquipoRepository equipos, PrestamoRepository prestamos, HistorialRepository historial,
-                              UsuarioRepository usuarios, Mapper mapper, SedeContexto sedes) {
+                              UsuarioRepository usuarios, Mapper mapper, SedeContexto sedes,
+                              LaboratorioRepository laboratorios, ReporteNovedadRepository reportes) {
         this.equipos = equipos; this.prestamos = prestamos; this.historial = historial;
         this.usuarios = usuarios; this.mapper = mapper; this.sedes = sedes;
+        this.laboratorios = laboratorios; this.reportes = reportes;
     }
 
     @Transactional(readOnly = true)
@@ -38,7 +43,9 @@ public class CoordinadorService {
         LocalDate d = desde != null ? desde : h.minusDays(29);
         var rango = prestamos.conSalidaEntre(d.atStartOfDay(), h.plusDays(1).atStartOfDay()).stream()
                 .filter(p -> sedes.pertenece(p.getEquipo(), sede)).toList();
-        var activosEq = equipos.findBySedeIdAndActivoTrueOrderByLaboratorioAscPlacaAsc(sede.getId());
+        var inventario = equipos.findBySedeIdAndActivoTrueOrderByLaboratorioAscPlacaAsc(sede.getId());
+        var activosEq = inventario.stream().filter(e -> !e.esInsumo()).toList();
+        var insumos = inventario.stream().filter(Equipo::esInsumo).toList();
         LocalDateTime ahora = mapper.ahora();
 
         var devueltos = rango.stream().filter(p -> p.getEstado() == EstadoPrestamo.DEVUELTO).toList();
@@ -48,7 +55,10 @@ public class CoordinadorService {
         long pct = devueltos.isEmpty() ? 100 : Math.round(100.0 * aTiempo / devueltos.size());
 
         Map<String, Long> porLab = rango.stream().collect(Collectors.groupingBy(p -> p.getEquipo().getLaboratorio(), Collectors.counting()));
-        var uso = LABORATORIOS.stream().map(l -> new UsoLaboratorioDto(l, porLab.getOrDefault(l, 0L))).toList();
+        List<String> labs = new ArrayList<>(laboratorios.findBySedeIdAndActivoTrueOrderByNombreAsc(sede.getId()).stream()
+                .map(Laboratorio::getNombre).toList());
+        porLab.keySet().stream().filter(l -> l != null && labs.stream().noneMatch(l::equalsIgnoreCase)).sorted().forEach(labs::add);
+        var uso = labs.stream().map(l -> new UsoLaboratorioDto(l, porLab.getOrDefault(l, 0L))).toList();
 
         Map<LocalDate, Long> porDia = rango.stream().collect(Collectors.groupingBy(p -> p.getFechaSalida().toLocalDate(), TreeMap::new, Collectors.counting()));
         List<SerieDiaDto> serie = new ArrayList<>();
@@ -64,7 +74,9 @@ public class CoordinadorService {
                 activosEq.stream().filter(e -> e.getEstado() == EstadoEquipo.MANTENIMIENTO).count(),
                 activos.size(), activos.stream().filter(p -> p.estaVencido(ahora)).count(),
                 rango.size(), devueltos.size(), rango.stream().filter(p -> p.getIncidencia() != null).count(),
-                tiempoMedio, pct, uso, serie);
+                tiempoMedio, pct, uso, serie, insumos.size(),
+                insumos.stream().filter(e -> e.getCantidad().signum() == 0 || (e.porcentaje() != null && e.porcentaje() <= AlertaService.UMBRAL_PCT)).count(),
+                reportes.findTop500BySedeIdOrderByCreadoEnDesc(sede.getId()).stream().filter(r -> r.getEstado() != ReporteNovedad.Estado.RESUELTO).count());
     }
 
     @Transactional(readOnly = true)

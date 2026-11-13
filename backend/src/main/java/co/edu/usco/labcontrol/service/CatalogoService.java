@@ -27,9 +27,16 @@ public class CatalogoService {
     /** Catálogo de la sede del usuario (el Coordinador ve el de la sede que tenga seleccionada). */
     @Transactional(readOnly = true)
     public List<EquipoDto> listar(Long usuarioId, String laboratorio, String categoria, String q) {
+        return listar(usuarioId, laboratorio, categoria, q, null);
+    }
+
+    /** tipo: EQUIPO, INSUMO o vacío (todos). */
+    @Transactional(readOnly = true)
+    public List<EquipoDto> listar(Long usuarioId, String laboratorio, String categoria, String q, String tipo) {
         String nq = normalizar(q);
         var sede = sedes.de(usuarioId);
         return equipos.findBySedeIdAndActivoTrueOrderByLaboratorioAscPlacaAsc(sede.getId()).stream()
+                .filter(e -> vacio(tipo) || e.getTipo().name().equalsIgnoreCase(tipo.trim()))
                 .filter(e -> vacio(laboratorio) || e.getLaboratorio().equalsIgnoreCase(laboratorio))
                 .filter(e -> vacio(categoria) || e.getCategoria().equalsIgnoreCase(categoria))
                 .filter(e -> nq.isEmpty() || normalizar(e.getPlaca() + " " + e.getNombre() + " " + e.getMarca() + " "

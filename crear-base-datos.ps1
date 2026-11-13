@@ -32,4 +32,4 @@ foreach ($s in $scripts) {
   & $mysql @credencial --host=127.0.0.1 --port=$Puerto --protocol=TCP --default-character-set=utf8mb4 --execute="source $ruta"
   if ($LASTEXITCODE -ne 0) { Write-Error "Falló $s. Revisa el mensaje de MySQL de arriba."; exit 1 }
 }
-Write-Host "Base de datos 'labcontrol' lista: 9 tablas, triggers del historial$(if (-not $SinDatos) { ', sede Neiva, usuarios e inventario' })." -ForegroundColor Green
+Write-Host "Base de datos 'labcontrol' lista: 12 tablas, triggers del historial$(if (-not $SinDatos) { ', sede Neiva, usuarios e inventario' })." -ForegroundColor Green

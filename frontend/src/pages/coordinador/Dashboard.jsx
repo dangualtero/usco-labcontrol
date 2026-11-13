@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { Boxes, CircleCheck, Clock, Download, FileBarChart2, ShieldCheck, TimerReset, TriangleAlert, Wrench, ArrowRightLeft, BadgeCheck } from 'lucide-react'
+import { Boxes, CircleCheck, Clock, Download, FileBarChart2, ShieldCheck, TimerReset, TriangleAlert, Wrench, ArrowRightLeft, BadgeCheck,
+  Wallet, FlaskConical, Building2, ArrowRight, Beaker, BellRing, Plus } from 'lucide-react'
 import { api } from '../../api/index.js'
 import { useSede } from '../../context/SedeContext.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
@@ -9,10 +10,56 @@ import { useTema } from '../../context/TemaContext.jsx'
 import { useDatos } from '../../lib/hooks.js'
 import { toDia, fmtDuracion } from '../../lib/fecha.js'
 import { descargarTexto } from '../../lib/descarga.js'
+import { pesos } from '../../lib/constantes.js'
 import { Cargando, ErrorCaja, Kpi } from '../../components/ui.jsx'
 
 const hoy = () => new Date()
 const haceDias = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d }
+
+/** Presupuesto, laboratorios y sedes: lo que existe hoy (no depende del rango de fechas). */
+function Panorama() {
+  const { ruta, slug, sede } = useSede()
+  const { datos, error } = useDatos(() => Promise.all([api.presupuestoResumen(), api.laboratorios(), api.sedesAdmin()]), [slug], { cada: 30000 })
+  if (error) return <ErrorCaja mensaje={error} />
+  if (!datos) return null
+  const [presu, labs, sedes] = datos
+  const deSede = presu.sedes.find((x) => x.sede.slug === slug)
+  const labsActivos = labs.filter((l) => l.activo)
+  const sedesActivas = sedes.filter((x) => x.sede.activa)
+  return (
+    <section className="grid gap-4 lg:grid-cols-3" aria-label="Panorama general">
+      <div className="card flex flex-col p-4 sm:p-5">
+        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-pizarra"><Wallet className="h-4 w-4 text-usco" aria-hidden="true" /> Presupuesto disponible</p>
+        <p className={`mt-1 font-titulo text-3xl font-extrabold ${deSede && deSede.saldo < 0 ? 'text-alerta-texto' : 'text-slate-900'}`}>{pesos(deSede?.saldo ?? 0)}</p>
+        <p className="text-sm text-pizarra">{sede?.nombre} · ingresos {pesos(deSede?.ingresos ?? 0)} · gastos {pesos(deSede?.gastos ?? 0)}</p>
+        <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm"><span className="font-semibold">Todas las sedes:</span> <strong>{pesos(presu.saldo)}</strong></p>
+        <Link to={ruta('/coordinador/presupuesto')} className="mt-auto inline-flex items-center gap-1 pt-3 text-sm font-bold text-usco hover:underline">Ver presupuesto <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+      </div>
+      <div className="card flex flex-col p-4 sm:p-5">
+        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-pizarra"><FlaskConical className="h-4 w-4 text-usco" aria-hidden="true" /> Laboratorios de la sede</p>
+        <p className="mt-1 font-titulo text-3xl font-extrabold text-slate-900">{labsActivos.length}</p>
+        <ul className="mt-2 flex flex-wrap gap-1.5">
+          {labsActivos.map((l) => <li key={l.id} className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-pizarra-oscuro">{l.nombre} <span className="text-pizarra">· {l.equipos + l.insumos}</span></li>)}
+          {labsActivos.length === 0 && <li className="text-sm text-pizarra">Aún no hay laboratorios en esta sede.</li>}
+        </ul>
+        <Link to={ruta('/coordinador/laboratorios')} className="mt-auto inline-flex items-center gap-1 pt-3 text-sm font-bold text-usco hover:underline"><Plus className="h-4 w-4" aria-hidden="true" /> Crear o administrar laboratorios</Link>
+      </div>
+      <div className="card flex flex-col p-4 sm:p-5">
+        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-pizarra"><Building2 className="h-4 w-4 text-usco" aria-hidden="true" /> Sedes</p>
+        <p className="mt-1 font-titulo text-3xl font-extrabold text-slate-900">{sedesActivas.length}<span className="text-base font-semibold text-pizarra"> activas de {sedes.length}</span></p>
+        <ul className="mt-2 space-y-1 text-sm">
+          {sedes.slice(0, 6).map((x) => (
+            <li key={x.sede.slug} className="flex items-center justify-between gap-2">
+              <span className={`truncate font-semibold ${x.sede.slug === slug ? 'text-usco' : ''}`}>{x.sede.nombre}{x.sede.activa ? '' : ' (inactiva)'}</span>
+              <span className="shrink-0 text-xs text-pizarra">{x.equipos} elem. · {pesos(x.saldo)}</span>
+            </li>
+          ))}
+        </ul>
+        <Link to={ruta('/coordinador/sedes')} className="mt-auto inline-flex items-center gap-1 pt-3 text-sm font-bold text-usco hover:underline">Administrar sedes <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+      </div>
+    </section>
+  )
+}
 
 export default function Dashboard() {
   const { ruta } = useSede()
@@ -63,6 +110,7 @@ export default function Dashboard() {
           <button className="btn-primary" type="submit"><FileBarChart2 className="h-4 w-4" aria-hidden="true" /> Generar reporte</button>
         </form>
       </div>
+      <Panorama />
       {errFecha && <p role="alert" className="flex items-center gap-1.5 text-sm font-semibold text-alerta-borde"><TriangleAlert className="h-4 w-4" aria-hidden="true" /> {errFecha}</p>}
       <ErrorCaja mensaje={error} />
       {!k && !error && <Cargando texto="Generando reporte…" />}
@@ -87,6 +135,15 @@ export default function Dashboard() {
             <Kpi etiqueta="Vencidos ahora" valor={k.vencidos} icono={TimerReset} tono="text-alerta-borde" fondo="bg-alerta-fondo" />
             <Kpi etiqueta="Disponibles" valor={k.disponibles} icono={CircleCheck} tono="text-entrada" fondo="bg-emerald-50" />
             <Kpi etiqueta="Prestados" valor={k.prestados} icono={Clock} tono="text-amber-700" fondo="bg-amber-50" />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Link to={ruta('/coordinador/alertas')} className="rounded-xl hover:shadow-lg">
+              <Kpi etiqueta="Insumos en alerta (25 % o menos)" valor={`${k.insumosEnAlerta} de ${k.totalInsumos}`} detalle="Ver alertas del inventario" icono={Beaker}
+                tono={k.insumosEnAlerta ? 'text-alerta-borde' : 'text-entrada'} fondo={k.insumosEnAlerta ? 'bg-alerta-fondo' : 'bg-emerald-50'} />
+            </Link>
+            <Link to={ruta('/coordinador/reportes')} className="rounded-xl hover:shadow-lg">
+              <Kpi etiqueta="Reportes sin resolver" valor={k.reportesAbiertos} detalle="Ver reportes y seguimiento" icono={BellRing} tono="text-usco" fondo="bg-usco-soft" />
+            </Link>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">

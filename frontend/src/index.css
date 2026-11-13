@@ -95,6 +95,11 @@
 .dark .text-red-900 { color: #FECACA; }
 .dark .text-emerald-700 { color: #6EE7B7; }
 .dark .bg-violet-50 { background-color: #251B47; }
+.dark .bg-sky-50 { background-color: #0B2838; }
+.dark .text-sky-900 { color: #BAE6FD; }
+.dark .bg-red-50\/60 { background-color: rgb(58 21 24 / .6); }
+@keyframes resaltar { from { background-color: rgb(197 160 89 / .35); } to { background-color: transparent; } }
+.resaltar { animation: resaltar 6s ease-out both; }
 .dark .text-violet-900 { color: #DDD6FE; }
 .dark .text-usco-darker { color: #F5B5B9; }
 .dark .bg-oro-claro.text-usco-darker { color: #5C0D12; }
@@ -127,6 +132,6 @@
 .aparecer { animation: aparecer .25s ease-out both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .pulso, .aparecer { animation: none; }
+  .pulso, .aparecer, .resaltar { animation: none; }
   body { transition: none; }
 }

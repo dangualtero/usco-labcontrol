@@ -81,15 +81,24 @@ public final class Controllers {
     @RequestMapping("/api/equipos")
     public static class CatalogoController {
         private final CatalogoService catalogo;
-        public CatalogoController(CatalogoService catalogo) { this.catalogo = catalogo; }
+        private final LaboratorioService laboratorios;
+        public CatalogoController(CatalogoService catalogo, LaboratorioService laboratorios) {
+            this.catalogo = catalogo; this.laboratorios = laboratorios;
+        }
 
+        /** tipo: EQUIPO, INSUMO o vacío (todos). */
         @GetMapping
         public List<EquipoDto> listar(@AuthenticationPrincipal AuthUser u,
                                       @RequestParam(required = false) String laboratorio,
                                       @RequestParam(required = false) String categoria,
-                                      @RequestParam(required = false) String q) {
-            return catalogo.listar(u.id(), laboratorio, categoria, q);
+                                      @RequestParam(required = false) String q,
+                                      @RequestParam(required = false) String tipo) {
+            return catalogo.listar(u.id(), laboratorio, categoria, q, tipo);
         }
+
+        /** Laboratorios activos de la sede (filtros y formularios). */
+        @GetMapping("/laboratorios")
+        public List<String> laboratorios(@AuthenticationPrincipal AuthUser u) { return laboratorios.nombres(u.id()); }
 
         @GetMapping("/{placa}")
         public EquipoDetalleDto detalle(@AuthenticationPrincipal AuthUser u, @PathVariable String placa) { return catalogo.detalle(u.id(), placa); }
@@ -99,7 +108,21 @@ public final class Controllers {
     @RequestMapping("/api/prestamos")
     public static class UsuarioController {
         private final PrestamoService servicio;
-        public UsuarioController(PrestamoService servicio) { this.servicio = servicio; }
+        private final InsumoService insumos;
+        public UsuarioController(PrestamoService servicio, InsumoService insumos) { this.servicio = servicio; this.insumos = insumos; }
+
+        /** Pedir una cantidad de un insumo (el auxiliar la aprueba o la rechaza). */
+        @PostMapping("/insumos/{placa}/solicitudes")
+        public SolicitudInsumoDto solicitarInsumo(@AuthenticationPrincipal AuthUser u, @PathVariable String placa,
+                                                  @RequestBody SolicitudInsumoRequest r) {
+            return insumos.solicitar(u.id(), placa, r);
+        }
+
+        @GetMapping("/insumos/mis")
+        public List<SolicitudInsumoDto> misInsumos(@AuthenticationPrincipal AuthUser u) { return insumos.mias(u.id()); }
+
+        @DeleteMapping("/insumos/solicitudes/{id}")
+        public SolicitudInsumoDto cancelarInsumo(@AuthenticationPrincipal AuthUser u, @PathVariable Long id) { return insumos.cancelar(u.id(), id); }
 
         @PostMapping("/reservas")
         public PrestamoDto reservar(@AuthenticationPrincipal AuthUser u, @RequestBody ReservaRequest r) {
@@ -121,8 +144,38 @@ public final class Controllers {
         private final PrestamoService servicio;
         private final InventarioService inventario;
         private final NovedadService novedades;
-        public VentanillaController(PrestamoService servicio, InventarioService inventario, NovedadService novedades) {
+        private final InsumoService insumos;
+        private final AlertaService alertas;
+        public VentanillaController(PrestamoService servicio, InventarioService inventario, NovedadService novedades,
+                                    InsumoService insumos, AlertaService alertas) {
             this.servicio = servicio; this.inventario = inventario; this.novedades = novedades;
+            this.insumos = insumos; this.alertas = alertas;
+        }
+
+        // ---- Solicitudes de insumos: el auxiliar aprueba (se descuenta) o rechaza
+        @GetMapping("/insumos/solicitudes")
+        public List<SolicitudInsumoDto> solicitudesInsumo(@AuthenticationPrincipal AuthUser u) { return insumos.deSede(u.id()); }
+
+        @PostMapping("/insumos/solicitudes/{id}/aprobar")
+        public SolicitudInsumoDto aprobarInsumo(@AuthenticationPrincipal AuthUser u, @PathVariable Long id,
+                                                @RequestBody(required = false) ResolverSolicitudRequest r) {
+            return insumos.aprobar(u.id(), id, r == null ? null : r.respuesta());
+        }
+
+        @PostMapping("/insumos/solicitudes/{id}/rechazar")
+        public SolicitudInsumoDto rechazarInsumo(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody ResolverSolicitudRequest r) {
+            return insumos.rechazar(u.id(), id, r.respuesta());
+        }
+
+        @GetMapping("/alertas")
+        public List<AlertaDto> alertas(@AuthenticationPrincipal AuthUser u) { return alertas.listar(u.id()); }
+
+        @GetMapping("/novedades/{id}/seguimiento")
+        public List<SeguimientoDto> seguimiento(@AuthenticationPrincipal AuthUser u, @PathVariable Long id) { return novedades.seguimiento(u.id(), id); }
+
+        @PostMapping("/novedades/{id}/seguimiento")
+        public NovedadDto seguir(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody SeguimientoRequest r) {
+            return novedades.seguir(u.id(), id, r);
         }
 
         /** El auxiliar reporta que un equipo se agotó, se dañó, se perdió o falla: se avisa al correo institucional. */
@@ -178,9 +231,19 @@ public final class Controllers {
         private final CoordinadorService servicio;
         private final InventarioService inventario;
         private final UsuariosService usuarios;
-        public CoordinadorController(CoordinadorService servicio, InventarioService inventario, UsuariosService usuarios) {
-            this.servicio = servicio; this.inventario = inventario; this.usuarios = usuarios;
+        private final AlertaService alertas;
+        private final InsumoService insumos;
+        public CoordinadorController(CoordinadorService servicio, InventarioService inventario, UsuariosService usuarios,
+                                     AlertaService alertas, InsumoService insumos) {
+            this.servicio = servicio; this.inventario = inventario; this.usuarios = usuarios; this.alertas = alertas; this.insumos = insumos;
         }
+
+        @GetMapping("/alertas")
+        public List<AlertaDto> alertas(@AuthenticationPrincipal AuthUser u) { return alertas.listar(u.id()); }
+
+        /** Solicitudes de insumos de la sede (consulta; las atiende el auxiliar). */
+        @GetMapping("/insumos/solicitudes")
+        public List<SolicitudInsumoDto> solicitudesInsumo(@AuthenticationPrincipal AuthUser u) { return insumos.deSede(u.id()); }
 
         @GetMapping("/kpis")
         public KpisDto kpis(@AuthenticationPrincipal AuthUser u,
@@ -316,12 +379,64 @@ public final class Controllers {
     @RequestMapping("/api/coordinador/novedades")
     public static class NovedadesController {
         private final NovedadService novedades;
-        public NovedadesController(NovedadService novedades) { this.novedades = novedades; }
+        private final ResumenDiarioService resumen;
+        private final SedeContexto sedes;
+        public NovedadesController(NovedadService novedades, ResumenDiarioService resumen, SedeContexto sedes) {
+            this.novedades = novedades; this.resumen = resumen; this.sedes = sedes;
+        }
 
         @GetMapping
         public List<NovedadDto> listar(@AuthenticationPrincipal AuthUser u) { return novedades.listar(u.id()); }
 
+        /** Vista «Reportes»: todos los reportes de la sede. */
+        @GetMapping("/todas")
+        public List<NovedadDto> todas(@AuthenticationPrincipal AuthUser u) { return novedades.todos(u.id()); }
+
+        /** Huella liviana para actualizar la vista en tiempo real (el navegador la consulta cada pocos segundos). */
+        @GetMapping("/version")
+        public VersionReportesDto version(@AuthenticationPrincipal AuthUser u) { return novedades.version(u.id()); }
+
+        /** ahora=true: envía el correo de inmediato aunque la prioridad no sea ALTA. */
         @PostMapping("/{id}/reenviar")
-        public NovedadDto reenviar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id) { return novedades.reenviar(u.id(), id); }
+        public NovedadDto reenviar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id,
+                                   @RequestParam(defaultValue = "false") boolean ahora) {
+            return novedades.reenviar(u.id(), id, ahora);
+        }
+
+        @GetMapping("/{id}/seguimiento")
+        public List<SeguimientoDto> seguimiento(@AuthenticationPrincipal AuthUser u, @PathVariable Long id) { return novedades.seguimiento(u.id(), id); }
+
+        @PostMapping("/{id}/seguimiento")
+        public NovedadDto seguir(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody SeguimientoRequest r) {
+            return novedades.seguir(u.id(), id, r);
+        }
+
+        /** Envía ya el resumen diario de la sede abierta (para probarlo sin esperar a la hora programada). */
+        @PostMapping("/resumen")
+        public ResumenEnviadoDto enviarResumen(@AuthenticationPrincipal AuthUser u) { return resumen.enviar(sedes.de(u.id()).getId(), true); }
+    }
+
+    /** Laboratorios de la sede abierta (solo Coordinador). */
+    @RestController
+    @RequestMapping("/api/coordinador/laboratorios")
+    public static class LaboratoriosController {
+        private final LaboratorioService laboratorios;
+        public LaboratoriosController(LaboratorioService laboratorios) { this.laboratorios = laboratorios; }
+
+        @GetMapping
+        public List<LaboratorioDto> listar(@AuthenticationPrincipal AuthUser u) { return laboratorios.listar(u.id()); }
+
+        @PostMapping
+        public LaboratorioDto crear(@AuthenticationPrincipal AuthUser u, @RequestBody LaboratorioRequest r) { return laboratorios.crear(u.id(), r); }
+
+        @PutMapping("/{id}")
+        public LaboratorioDto actualizar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody LaboratorioRequest r) {
+            return laboratorios.actualizar(u.id(), id, r);
+        }
+
+        @PutMapping("/{id}/activo")
+        public LaboratorioDto activo(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody ActivoRequest r) {
+            return laboratorios.activar(u.id(), id, r.activo());
+        }
     }
 }
