@@ -171,12 +171,14 @@ public class NotificadorNovedades {
         p.put("enviadoAMantenimiento", n.isEnMantenimiento());
         p.put("reportadoPor", n.getReportadoPor());
         p.put("reportadoPorCorreo", n.getReportadoPorCorreo());
+        p.put("validadoPor", n.getValidadoPor());
+        p.put("observacionValidacion", n.getObservacionValidacion());
         p.put("fecha", n.getCreadoEn().toString());
         p.put("fechaTexto", FECHA.format(n.getCreadoEn()));
         p.put("sede", sede);
         p.put("equipo", equipo);
         p.put("destinatario", destino);
-        p.put("enlace", appUrl + "/" + n.getSede().getSlug() + "/coordinador/reportes");
+        p.put("enlace", appUrl + "/" + n.getSede().getSlug() + "/novedades");
         p.put("politicaCorreo", "Solo la prioridad ALTA se envía al instante; MEDIA y BAJA van en el resumen diario");
         return p;
     }
@@ -191,17 +193,17 @@ public class NotificadorNovedades {
                 Equipo:      %s · %s
                 Laboratorio: %s%s
                 Novedad:     %s
-                Reportó:     %s
+                Reportó:     %s (validó: %s)
                 Fecha:       %s
                 Mantenimiento: %s
 
-                Descripción del auxiliar:
+                Descripción:
                 %s
 
                 Ver reportes: %s
                 """.formatted(prioridad, ((Map<?, ?>) p.get("sede")).get("nombre"), eq.get("placa"), eq.get("nombre"), eq.get("laboratorio"),
-                eq.get("ubicacion") == null ? "" : " · " + eq.get("ubicacion"), p.get("tipoTexto"), p.get("reportadoPor"), p.get("fechaTexto"),
-                Boolean.TRUE.equals(p.get("enviadoAMantenimiento")) ? "sí, se retiró del préstamo" : "no", p.get("descripcion"), p.get("enlace"));
+                eq.get("ubicacion") == null ? "" : " · " + eq.get("ubicacion"), p.get("tipoTexto"), p.get("reportadoPor"), p.get("validadoPor") == null ? "—" : p.get("validadoPor"), p.get("fechaTexto"),
+                Boolean.TRUE.equals(p.get("enviadoAMantenimiento")) ? "sí, el equipo pasó a mantenimiento" : "no", p.get("descripcion"), p.get("enlace"));
     }
 
     static String prioridadPorReglas(String tipo) {

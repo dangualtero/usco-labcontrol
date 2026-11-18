@@ -32,6 +32,9 @@ public class MovimientoPresupuesto {
     private LocalDate fecha;
     /** Placa del equipo relacionado, si aplica (compra o mantenimiento de un equipo). */
     private String placa;
+    /** Solicitud a la que corresponde el gasto (opcional). */
+    @ManyToOne
+    private Solicitud solicitud;
 
     private String registradoPor;
     private LocalDateTime registradoEn;
@@ -64,6 +67,8 @@ public class MovimientoPresupuesto {
     public long getMonto() { return monto; }
     public LocalDate getFecha() { return fecha; }
     public String getPlaca() { return placa; }
+    public Solicitud getSolicitud() { return solicitud; }
+    public void setSolicitud(Solicitud solicitud) { this.solicitud = solicitud; }
     public String getRegistradoPor() { return registradoPor; }
     public LocalDateTime getRegistradoEn() { return registradoEn; }
     public boolean isAnulado() { return anulado; }

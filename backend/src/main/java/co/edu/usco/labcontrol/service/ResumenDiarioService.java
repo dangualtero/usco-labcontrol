@@ -3,10 +3,10 @@ package co.edu.usco.labcontrol.service;
 import co.edu.usco.labcontrol.domain.ReporteNovedad;
 import co.edu.usco.labcontrol.domain.ReporteNovedad.Notificacion;
 import co.edu.usco.labcontrol.domain.Sede;
-import co.edu.usco.labcontrol.domain.SolicitudInsumo;
+import co.edu.usco.labcontrol.domain.Solicitud;
 import co.edu.usco.labcontrol.repo.ReporteNovedadRepository;
 import co.edu.usco.labcontrol.repo.SedeRepository;
-import co.edu.usco.labcontrol.repo.SolicitudInsumoRepository;
+import co.edu.usco.labcontrol.repo.SolicitudRepository;
 import co.edu.usco.labcontrol.web.Dtos.AlertaDto;
 import co.edu.usco.labcontrol.web.Dtos.ResumenEnviadoDto;
 import java.time.format.DateTimeFormatter;
@@ -22,7 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Resumen diario por correo (una vez cada 24 horas, por defecto a las 7:00 a. m. hora de Colombia):
  * los reportes de prioridad MEDIA y BAJA que no se enviaron al instante, los insumos agotados o con 25 % o menos,
- * los reportes ALTA que siguen abiertos y las solicitudes de insumos sin atender. Una sede sin novedades ni alertas
+ * los reportes ALTA que siguen abiertos, las novedades por validar y las solicitudes que esperan decisión. Una sede sin novedades ni alertas
  * de inventario no recibe correo ese día.
  */
 @Service
@@ -33,7 +33,7 @@ public class ResumenDiarioService {
 
     private final SedeRepository sedes;
     private final ReporteNovedadRepository reportes;
-    private final SolicitudInsumoRepository solicitudes;
+    private final SolicitudRepository solicitudes;
     private final AlertaService alertas;
     private final CorreoService correo;
     private final Mapper mapper;
@@ -41,7 +41,7 @@ public class ResumenDiarioService {
     private final String destino;
     private final String appUrl;
 
-    public ResumenDiarioService(SedeRepository sedes, ReporteNovedadRepository reportes, SolicitudInsumoRepository solicitudes,
+    public ResumenDiarioService(SedeRepository sedes, ReporteNovedadRepository reportes, SolicitudRepository solicitudes,
                                 AlertaService alertas, CorreoService correo, Mapper mapper, TransactionTemplate tx,
                                 @Value("${labcontrol.novedades.destino:u20232215593@usco.edu.co}") String destino,
                                 @Value("${labcontrol.app-url:http://localhost:5173}") String appUrl) {
@@ -57,7 +57,7 @@ public class ResumenDiarioService {
         }
     }
 
-    /** forzar = enviarlo aunque no haya nada nuevo (botón «Enviar resumen ahora» del Coordinador). */
+    /** forzar = enviarlo aunque no haya nada nuevo (botón «Enviar resumen ahora» del Administrador). */
     public ResumenEnviadoDto enviar(Long sedeId, boolean forzar) {
         Contenido c = tx.execute(st -> contenido(sedeId));
         if (c == null) return new ResumenEnviadoDto(false, 0, 0, destino, "La sede no existe");
@@ -92,7 +92,9 @@ public class ResumenDiarioService {
         List<AlertaDto> inventario = alertas.inventario(sede);
         List<ReporteNovedad> altasAbiertas = reportes.findBySedeIdAndPrioridadAndEstadoInOrderByCreadoEnDesc(sede.getId(), "ALTA",
                 List.of(ReporteNovedad.Estado.ABIERTO, ReporteNovedad.Estado.EN_PROCESO));
-        long solicitudesPend = solicitudes.countBySedeIdAndEstado(sede.getId(), SolicitudInsumo.Estado.PENDIENTE);
+        long porValidar = reportes.countBySedeIdAndValidacion(sede.getId(), ReporteNovedad.Validacion.PENDIENTE);
+        long solicitudesPend = solicitudes.findTop500BySedeIdOrderByCreadoEnDesc(sede.getId()).stream()
+                .filter(x -> x.getEstado() == Solicitud.Estado.ENVIADA).count();
 
         StringBuilder t = new StringBuilder();
         t.append("Resumen diario de USCO LabControl · ").append(sede.getNombre()).append('\n')
@@ -118,9 +120,11 @@ public class ResumenDiarioService {
 
         t.append("\nPENDIENTES\n")
                 .append("  • Reportes de prioridad ALTA sin resolver: ").append(altasAbiertas.size()).append('\n')
-                .append("  • Solicitudes de insumos sin atender: ").append(solicitudesPend).append("\n\n")
-                .append("Ver reportes: ").append(appUrl).append('/').append(sede.getSlug()).append("/coordinador/reportes\n")
-                .append("Ver alertas:  ").append(appUrl).append('/').append(sede.getSlug()).append("/coordinador/alertas\n\n")
+                .append("  • Novedades esperando validación del coordinador: ").append(porValidar).append('\n')
+                .append("  • Solicitudes enviadas esperando decisión: ").append(solicitudesPend).append("\n\n")
+                .append("Ver novedades:   ").append(appUrl).append('/').append(sede.getSlug()).append("/novedades\n")
+                .append("Ver solicitudes: ").append(appUrl).append('/').append(sede.getSlug()).append("/solicitudes\n")
+                .append("Ver alertas:     ").append(appUrl).append('/').append(sede.getSlug()).append("/alertas\n\n")
                 .append("Los reportes de prioridad ALTA se envían al instante; este resumen llega una vez al día.\n");
         // Cargar las relaciones dentro de la transacción (el correo se arma con ellas fuera de ella)
         pendientes.forEach(r -> r.getEquipo().getPlaca());

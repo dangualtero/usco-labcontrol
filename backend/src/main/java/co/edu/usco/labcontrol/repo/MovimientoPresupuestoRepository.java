@@ -7,4 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface MovimientoPresupuestoRepository extends JpaRepository<MovimientoPresupuesto, Long> {
     List<MovimientoPresupuesto> findBySedeIdOrderByFechaDescIdDesc(Long sedeId);
     List<MovimientoPresupuesto> findAllByOrderByFechaDescIdDesc();
+    List<MovimientoPresupuesto> findBySolicitudIdOrderByFechaDesc(Long solicitudId);
 }

@@ -19,7 +19,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-/** RNF-03: autenticación obligatoria y autorización por roles (Estudiante/Docente, Auxiliar, Coordinador). */
+/** RNF-03: autenticación obligatoria y autorización por roles (Administrador general, Coordinador y Monitor de Laboratorio). */
 @Configuration
 public class SecurityConfig {
 
@@ -33,17 +33,14 @@ public class SecurityConfig {
             .authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/auth/login", "/api/salud").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/auth/registro", "/api/auth/registro/verificar", "/api/auth/registro/reenviar").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/sedes", "/api/imagenes/*").permitAll()
-                .requestMatchers("/api/auth/**").authenticated()
-                .requestMatchers("/api/equipos/**").authenticated()
-                .requestMatchers("/api/prestamos/**").hasAnyRole("ESTUDIANTE", "DOCENTE")
-                .requestMatchers("/api/ventanilla/**").hasRole("AUXILIAR")
-                .requestMatchers("/api/coordinador/**").hasRole("COORDINADOR")
+                // Los permisos finos (por rol y laboratorio) se comprueban en cada servicio con la matriz de permisos
+                .requestMatchers("/api/admin/**").hasRole("ADMINISTRADOR")
+                .requestMatchers("/api/**").authenticated()
                 .anyRequest().denyAll())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint((req, res, ex) -> escribir(res, 401, "Sesión no válida o expirada"))
-                .accessDeniedHandler((req, res, ex) -> escribir(res, 403, "Acceso restringido: su rol no permite esta función")))
+                .accessDeniedHandler((req, res, ex) -> escribir(res, 403, "Acceso restringido: tu rol no permite esta función")))
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

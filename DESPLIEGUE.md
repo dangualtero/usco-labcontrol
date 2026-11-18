@@ -15,10 +15,10 @@ Todo se levanta con un solo archivo: `docker-compose.prod.yml`.
 
 | Qué | Cómo probarlo en local |
 |---|---|
-| Registro con código | Sin configurar correo, el código aparece en la consola de IntelliJ (busca `CORREO NO ENVIADO`). |
+| Correos sin configurar | Sin `MAIL_HOST`, los avisos (novedad por validar, solicitud enviada…) aparecen en la consola de IntelliJ (busca `CORREO NO ENVIADO`). |
 | Correo real | En IntelliJ → *Run → Edit Configurations → Environment variables* agrega `MAIL_HOST=smtp.gmail.com;MAIL_PORT=587;MAIL_USERNAME=tu@gmail.com;MAIL_PASSWORD=contraseña-de-aplicación` |
 | n8n + IA | Ver [n8n/README.md](n8n/README.md). En local: `N8N_WEBHOOK_URL=http://localhost:5678/webhook/labcontrol-novedades` y `N8N_WEBHOOK_TOKEN=…` |
-| Novedad | Entra como auxiliar → **Inventario → Reportar novedad**. En **Coordinador → Reportes** verás la prioridad que puso la IA (solo ALTA llega al correo al instante; MEDIA y BAJA, en el resumen diario). |
+| Novedad | Entra como monitor → **Inventario → Novedad** (registro preliminar). Como coordinador, en **Novedades** valídala: ahí se aplica al inventario y se avisa por n8n (solo ALTA llega al correo al instante; MEDIA y BAJA, en el resumen diario). |
 
 **Gmail como remitente:** activa la verificación en dos pasos en la cuenta y crea una *contraseña de aplicación* (Cuenta de Google → Seguridad → Contraseñas de aplicaciones). Si tu cuenta @usco.edu.co no permite contraseñas de aplicación, usa una cuenta Gmail personal solo para enviar; los destinatarios siguen siendo los correos @usco.edu.co.
 
@@ -63,7 +63,7 @@ openssl rand -hex 24   # N8N_WEBHOOK_TOKEN
 openssl rand -hex 24   # N8N_ENCRYPTION_KEY
 ```
 
-Completa como mínimo `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD`, `LABCONTROL_JWT_SECRET`, `LABCONTROL_APP_URL` (por ejemplo `https://labcontrol.tudominio.com` o `http://IP-DEL-SERVIDOR`), los datos de `MAIL_*`, `N8N_WEBHOOK_TOKEN` y `N8N_ENCRYPTION_KEY`.
+Completa como mínimo `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD`, `LABCONTROL_JWT_SECRET`, `LABCONTROL_ADMIN_CORREO`, `LABCONTROL_ADMIN_CLAVE`, `LABCONTROL_APP_URL` (por ejemplo `https://labcontrol.tudominio.com` o `http://IP-DEL-SERVIDOR`), los datos de `MAIL_*`, `N8N_WEBHOOK_TOKEN` y `N8N_ENCRYPTION_KEY`.
 
 > `.env` está en `.gitignore`: **nunca** lo subas a GitHub.
 
@@ -76,13 +76,11 @@ docker compose -f docker-compose.prod.yml logs -f backend     # espera «Started
 
 Abre `http://IP-DEL-SERVIDOR/` → «Elige tu sede».
 
-### ⚠️ Cuentas de ejemplo
+### Primer ingreso
 
-Con `LABCONTROL_SEED=true` se crean las cuentas de prueba del README, y sus contraseñas están publicadas en GitHub. **Apenas arranque por primera vez**:
-
-1. Entra como coordinador y, en **Usuarios**, crea tu propia cuenta de coordinador con una contraseña nueva.
-2. Desactiva las cuentas de ejemplo o cámbiales la contraseña.
-3. Cambia `LABCONTROL_SEED=false` en `.env`.
+La base no trae cuentas. Con `LABCONTROL_ADMIN_CORREO` y `LABCONTROL_ADMIN_CLAVE` definidos en `.env`, el backend crea el
+primer **Administrador general** al arrancar (solo si no existe ninguno). Entra con esos datos, crea los coordinadores y
+monitores (con sus laboratorios) en **Administración → Usuarios y roles** y luego borra `LABCONTROL_ADMIN_CLAVE` del `.env`.
 
 ## 5. HTTPS y dominio
 
@@ -115,15 +113,19 @@ Dentro de Docker, el backend ya está configurado para llamar a `http://n8n:5678
 ## 7. Actualizar la base de datos cuando hay una versión nueva
 
 Los scripts de `backend/db/` solo se ejecutan solos la **primera vez** (cuando el volumen de MySQL está vacío). Si tu
-servidor ya tenía datos y la versión nueva trae un script de migración (por ejemplo `05_insumos_laboratorios_reportes.sql`),
-ejecútalo una vez después del `git pull`:
+servidor ya tenía datos y la versión nueva trae un script de migración, ejecútalo una vez después del `git pull`.
+Para pasar a la **v2.0** (roles y módulos nuevos) es `06_roles_y_modulos.sql` (si el servidor no tenía la v1.4, ejecuta
+antes el `05_insumos_laboratorios_reportes.sql` con el mismo comando):
 
 ```bash
 docker compose -f docker-compose.prod.yml exec -T mysql \
   sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --default-character-set=utf8mb4 labcontrol' \
-  < backend/db/05_insumos_laboratorios_reportes.sql
+  < backend/db/06_roles_y_modulos.sql
 docker compose -f docker-compose.prod.yml up -d --build
 ```
+
+Después entra como Administrador general y revisa en **Usuarios y roles** los laboratorios de cada coordinador y monitor
+(la migración les asigna todos los de su sede, y deja desactivadas las cuentas que eran de estudiantes).
 
 ## 8. Mantenimiento
 

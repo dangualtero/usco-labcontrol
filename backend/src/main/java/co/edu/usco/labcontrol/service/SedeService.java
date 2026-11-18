@@ -97,7 +97,7 @@ public class SedeService {
 
     /** «La Plata» → «la-plata», «Garzón» → «garzon». */
     static String slug(String texto) {
-        return CatalogoService.normalizar(texto).replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
+        return Texto.normalizar(texto).replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
     }
 
     private static String limpio(String s) { return s == null || s.isBlank() ? null : s.trim().replaceAll("\\s+", " "); }

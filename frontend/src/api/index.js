@@ -12,7 +12,7 @@ let token = null
 export const setToken = (t) => { token = t }
 
 // Sede activa (segmento de la URL: /neiva, /pitalito…). Se envía en cada petición en la cabecera X-Sede.
-// El servidor solo la usa para el Coordinador general; a los demás usuarios siempre les aplica su propia sede.
+// El servidor solo la usa para el Administrador general; a coordinadores y monitores siempre les aplica su propia sede.
 let sede = null
 export const setSede = (s) => { sede = s || null }
 export const getSede = () => sede
@@ -70,101 +70,150 @@ async function pedir(metodo, ruta, { cuerpo, params, texto, form } = {}) {
 const get = (r, params) => pedir('GET', r, { params })
 const post = (r, cuerpo = {}) => pedir('POST', r, { cuerpo })
 const put = (r, cuerpo = {}) => pedir('PUT', r, { cuerpo })
+const del = (r) => pedir('DELETE', r)
 const todos = (v) => (v === 'todos' ? '' : v)
+const enc = encodeURIComponent
+
+/** Arma un FormData: los arreglos de archivos se agregan con el mismo nombre; null/undefined se omiten. */
+const formulario = (campos) => {
+  const f = new FormData()
+  Object.entries(campos).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === '') return
+    if (Array.isArray(v)) v.forEach((a) => f.append(k, a, a.name))
+    else if (v instanceof Blob) f.append(k, v, v.name || 'archivo')
+    else f.append(k, String(v))
+  })
+  return f
+}
+const enviarForm = (ruta, campos) => pedir('POST', ruta, { form: formulario(campos) })
+
+/** Descarga un archivo protegido (con el token de la sesión) y devuelve un Blob. */
+export async function descargarProtegido(ruta) {
+  let res
+  try {
+    res = await fetch(`/api${ruta}`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(sede ? { 'X-Sede': sede } : {}), 'ngrok-skip-browser-warning': '1' },
+    })
+  } catch { marcar(false); throw new ApiError(MSG_CONEXION, 0) }
+  if (!res.ok) {
+    let msg = 'No se pudo descargar el archivo'
+    try { msg = (await res.json()).error ?? msg } catch { /* sin cuerpo JSON */ }
+    throw new ApiError(msg, res.status)
+  }
+  return res.blob()
+}
 
 export const api = {
-  // Autenticación
+  // ---- Sesión
   salud: () => get('/salud'),
   login: ({ email, password, recordar }) => post('/auth/login', { email, password, recordar: !!recordar, sede }),
   sedes: () => get('/sedes'),
   yo: () => get('/auth/yo'),
   cambiarClave: (actual, nueva) => post('/auth/cambiar-clave', { actual, nueva }),
 
-  // Registro de estudiantes con código de verificación al correo institucional
-  registro: (r) => post('/auth/registro', { ...r, sede }),
-  verificarRegistro: (correo, codigo) => post('/auth/registro/verificar', { correo, codigo }),
-  reenviarCodigo: (correo) => post('/auth/registro/reenviar', { correo }),
+  // ---- Tablero, alertas, indicadores y reportes
+  tablero: () => get('/tablero'),
+  alertas: () => get('/alertas'),
+  indicadores: () => get('/reportes/indicadores'),
+  reporteCsv: (tipo, f = {}) => pedir('GET', `/reportes/${tipo}.csv`, { params: { ...f, laboratorio: todos(f.laboratorio) }, texto: true }),
+  historial: (f = {}) => get('/historial', { ...f, laboratorio: todos(f.laboratorio) }),
 
-  // Catálogo
-  equipos: (f = {}) => get('/equipos', { laboratorio: todos(f.laboratorio), categoria: todos(f.categoria), q: f.q, tipo: todos(f.tipo) }),
-  laboratoriosSede: () => get('/equipos/laboratorios'),
-  equipoDetalle: (placa) => get(`/equipos/${encodeURIComponent(placa)}`),
+  // ---- Catálogos (valores activos, para formularios)
+  catalogos: () => get('/catalogos'),
 
-  // Estudiante / Docente
-  reservar: (r) => post('/prestamos/reservas', r),
-  cancelarReserva: (id) => pedir('DELETE', `/prestamos/reservas/${id}`),
-  misPrestamos: () => get('/prestamos/mis'),
-  // Insumos: se piden por cantidad y el auxiliar aprueba o rechaza
-  solicitarInsumo: (placa, r) => post(`/prestamos/insumos/${encodeURIComponent(placa)}/solicitudes`, r),
-  misInsumos: () => get('/prestamos/insumos/mis'),
-  cancelarInsumo: (id) => pedir('DELETE', `/prestamos/insumos/solicitudes/${id}`),
+  // ---- Laboratorios: caracterización y documentación
+  laboratorios: () => get('/laboratorios'),
+  laboratoriosRef: () => get('/laboratorios/referencias'),
+  laboratorio: (id) => get(`/laboratorios/${id}`),
+  crearLaboratorio: (r) => post('/laboratorios', r),
+  actualizarLaboratorio: (id, r) => put(`/laboratorios/${id}`, r),
+  activarLaboratorio: (id, activo) => put(`/laboratorios/${id}/activo`, { activo }),
+  caracterizar: (id, r) => put(`/laboratorios/${id}/caracterizacion`, r),
+  subirDocumento: (id, { tipo, titulo, descripcion, archivo }) => enviarForm(`/laboratorios/${id}/documentos`, { tipo, titulo, descripcion, archivo }),
+  quitarDocumento: (id, docId) => del(`/laboratorios/${id}/documentos/${docId}`),
 
-  // Auxiliar (ventanilla)
-  panel: () => get('/ventanilla/panel'),
-  solicitudesUsuario: (criterio) => get(`/ventanilla/usuarios/${encodeURIComponent(criterio)}/solicitudes`),
-  salida: (r) => post('/ventanilla/salida', r),
-  entrada: (r) => post('/ventanilla/entrada', r),
-  rechazarReserva: (id, motivo) => post(`/ventanilla/reservas/${id}/rechazar`, { motivo }),
-  cierreTurno: () => get('/ventanilla/cierre-turno'),
-  transferirCustodia: (id) => post('/ventanilla/cierre-turno', { auxiliarDestinoId: id }),
-  estadoEquipoAux: (placa, estado, motivo) => post(`/ventanilla/equipos/${encodeURIComponent(placa)}/estado`, { estado, motivo }),
-  // Novedades (agotado, dañado, perdido…): avisan al correo institucional mediante el agente de IA de n8n
-  reportarNovedad: (placa, r) => post(`/ventanilla/equipos/${encodeURIComponent(placa)}/novedades`, r),
-  novedadesAux: () => get('/ventanilla/novedades'),
-  seguimientoAux: (id) => get(`/ventanilla/novedades/${id}/seguimiento`),
-  seguirAux: (id, r) => post(`/ventanilla/novedades/${id}/seguimiento`, r),
-  solicitudesInsumoAux: () => get('/ventanilla/insumos/solicitudes'),
-  aprobarInsumo: (id, respuesta) => post(`/ventanilla/insumos/solicitudes/${id}/aprobar`, { respuesta }),
-  rechazarInsumo: (id, respuesta) => post(`/ventanilla/insumos/solicitudes/${id}/rechazar`, { respuesta }),
-  alertasAux: () => get('/ventanilla/alertas'),
+  // ---- Inventario
+  inventario: (f = {}) => get('/inventario', { tipo: todos(f.tipo), laboratorio: todos(f.laboratorio), q: f.q, bajas: f.bajas ? true : undefined }),
+  hojaVida: (placa) => get(`/inventario/${enc(placa)}`),
+  crearEquipo: (r) => post('/inventario', r),
+  actualizarEquipo: (placa, r) => put(`/inventario/${enc(placa)}`, r),
+  operativo: (placa, r) => put(`/inventario/${enc(placa)}/operativo`, r),
+  estadoEquipo: (placa, estado, motivo) => post(`/inventario/${enc(placa)}/estado`, { estado, motivo }),
+  baja: (placa, motivo) => post(`/inventario/${enc(placa)}/baja`, { motivo }),
+  subirImagen: (archivo) => enviarForm('/inventario/imagenes', { archivo }),
 
-  // Coordinador
-  kpis: (f = {}) => get('/coordinador/kpis', f),
-  historial: (f = {}) => get('/coordinador/historial', { ...f, laboratorio: todos(f.laboratorio) }),
-  reporteCsv: (f = {}) => pedir('GET', '/coordinador/reporte.csv', { params: { ...f, laboratorio: todos(f.laboratorio) }, texto: true }),
-  equiposAdmin: () => get('/coordinador/equipos'),
-  crearEquipo: (r) => post('/coordinador/equipos', r),
-  actualizarEquipo: (placa, r) => put(`/coordinador/equipos/${encodeURIComponent(placa)}`, r),
-  estadoEquipo: (placa, estado, motivo) => post(`/coordinador/equipos/${encodeURIComponent(placa)}/estado`, { estado, motivo }),
-  baja: (placa, motivo) => post(`/coordinador/equipos/${encodeURIComponent(placa)}/baja`, { motivo }),
-  usuarios: () => get('/coordinador/usuarios'),
-  crearUsuario: (r) => post('/coordinador/usuarios', r),
-  usuarioActivo: (id, activo) => put(`/coordinador/usuarios/${id}/activo`, { activo }),
-  usuarioClave: (id, nueva) => post(`/coordinador/usuarios/${id}/clave`, { nueva }),
+  // ---- Mantenimientos
+  mantenimientos: (f = {}) => get('/mantenimientos', { estado: todos(f.estado), laboratorio: todos(f.laboratorio), placa: f.placa }),
+  crearMantenimiento: (r) => post('/mantenimientos', r),
+  actualizarMantenimiento: (id, r) => put(`/mantenimientos/${id}`, r),
+  estadoMantenimiento: (id, r) => post(`/mantenimientos/${id}/estado`, r),
 
-  // Coordinador · sedes
-  sedesAdmin: () => get('/coordinador/sedes'),
-  crearSede: (r) => post('/coordinador/sedes', r),
-  actualizarSede: (slug, r) => put(`/coordinador/sedes/${encodeURIComponent(slug)}`, r),
-  activarSede: (slug, activo) => put(`/coordinador/sedes/${encodeURIComponent(slug)}/activa`, { activo }),
+  // ---- Novedades: registro preliminar y validación
+  novedades: (f = {}) => get('/novedades', { validacion: todos(f.validacion), laboratorio: todos(f.laboratorio), placa: f.placa }),
+  novedadesVersion: () => get('/novedades/version'),
+  reportarNovedad: (placa, { tipo, descripcion, mantenimiento, cantidad, unidad, archivos }) =>
+    enviarForm(`/novedades/${enc(placa)}`, { tipo, descripcion, mantenimiento, cantidad, unidad, archivos }),
+  validarNovedad: (id, observacion) => post(`/novedades/${id}/validar`, { observacion }),
+  rechazarNovedad: (id, observacion) => post(`/novedades/${id}/rechazar`, { observacion }),
+  reenviarNovedad: (id, ahora = false) => pedir('POST', `/novedades/${id}/reenviar`, { cuerpo: {}, params: ahora ? { ahora: true } : undefined }),
+  seguimientoNovedad: (id) => get(`/novedades/${id}/seguimiento`),
+  seguirNovedad: (id, r) => post(`/novedades/${id}/seguimiento`, r),
 
-  // Coordinador · presupuesto (de la sede activa)
-  presupuesto: () => get('/coordinador/presupuesto'),
-  presupuestoResumen: () => get('/coordinador/presupuesto/resumen'),
-  registrarMovimiento: (r) => post('/coordinador/presupuesto/movimientos', r),
-  anularMovimiento: (id, motivo) => post(`/coordinador/presupuesto/movimientos/${id}/anular`, { motivo }),
+  // ---- Solicitudes y requerimientos
+  solicitudes: (f = {}) => get('/solicitudes', { estado: todos(f.estado), laboratorioId: todos(f.laboratorioId), q: f.q }),
+  solicitud: (id) => get(`/solicitudes/${id}`),
+  crearSolicitud: (r) => post('/solicitudes', r),
+  actualizarSolicitud: (id, r) => put(`/solicitudes/${id}`, r),
+  adjuntar: (id, tipo, archivo) => enviarForm(`/solicitudes/${id}/adjuntos`, { tipo, archivo }),
+  quitarAdjunto: (id, adjuntoId) => del(`/solicitudes/${id}/adjuntos/${adjuntoId}`),
+  enviarSolicitud: (id, texto) => post(`/solicitudes/${id}/enviar`, { texto }),
+  devolverSolicitud: (id, texto) => post(`/solicitudes/${id}/devolver`, { texto }),
+  priorizar: (id, r) => post(`/solicitudes/${id}/priorizar`, r),
+  decidir: (id, decision, motivo) => post(`/solicitudes/${id}/decidir`, { decision, motivo }),
+  cerrarSolicitud: (id, texto) => post(`/solicitudes/${id}/cerrar`, { texto }),
+  cancelarSolicitud: (id, texto) => post(`/solicitudes/${id}/cancelar`, { texto }),
+  presupuestoSolicitud: (id, r) => put(`/solicitudes/${id}/presupuesto`, r),
+  contratacion: (id, r) => put(`/solicitudes/${id}/contratacion`, r),
 
-  // Coordinador · novedades reportadas por los auxiliares
-  novedadesCoord: () => get('/coordinador/novedades'),
-  reportesTodos: () => get('/coordinador/novedades/todas'),
-  reportesVersion: () => get('/coordinador/novedades/version'),
-  reenviarNovedad: (id, ahora = false) => pedir('POST', `/coordinador/novedades/${id}/reenviar`, { cuerpo: {}, params: ahora ? { ahora: true } : undefined }),
-  seguimientoCoord: (id) => get(`/coordinador/novedades/${id}/seguimiento`),
-  seguirCoord: (id, r) => post(`/coordinador/novedades/${id}/seguimiento`, r),
-  enviarResumen: () => post('/coordinador/novedades/resumen'),
-  alertasCoord: () => get('/coordinador/alertas'),
-  solicitudesInsumoCoord: () => get('/coordinador/insumos/solicitudes'),
+  // ---- Presupuesto de la sede
+  presupuesto: () => get('/presupuesto'),
+  presupuestoResumen: () => get('/presupuesto/resumen'),
+  registrarMovimiento: (r) => post('/presupuesto/movimientos', r),
+  anularMovimiento: (id, motivo) => post(`/presupuesto/movimientos/${id}/anular`, { motivo }),
 
-  // Coordinador · laboratorios de la sede abierta
-  laboratorios: () => get('/coordinador/laboratorios'),
-  crearLaboratorio: (r) => post('/coordinador/laboratorios', r),
-  actualizarLaboratorio: (id, r) => put(`/coordinador/laboratorios/${id}`, r),
-  activarLaboratorio: (id, activo) => put(`/coordinador/laboratorios/${id}/activo`, { activo }),
+  // ---- Seguimiento: compromisos y avances
+  compromisos: (f = {}) => get('/seguimiento/compromisos', { estado: todos(f.estado), laboratorioId: todos(f.laboratorioId) }),
+  crearCompromiso: (r) => post('/seguimiento/compromisos', r),
+  actualizarCompromiso: (id, r) => put(`/seguimiento/compromisos/${id}`, r),
+  estadoCompromiso: (id, estado) => post(`/seguimiento/compromisos/${id}/estado`, { estado }),
+  personas: (laboratorioId) => get('/seguimiento/personas', { laboratorioId }),
+  avances: (f = {}) => get('/seguimiento/avances', f),
+  registrarAvance: ({ laboratorioId, compromisoId, solicitudId, descripcion, porcentaje, evidencias }) =>
+    enviarForm('/seguimiento/avances', { laboratorioId, compromisoId, solicitudId, descripcion, porcentaje, evidencias }),
+  verificarAvance: (id, resultado, observacion) => post(`/seguimiento/avances/${id}/verificar`, { resultado, observacion }),
 
-  // Coordinador · fotografías desde el computador o el celular
-  subirImagen: (archivo) => {
-    const f = new FormData()
-    f.append('archivo', archivo, archivo.name || 'foto.jpg')
-    return pedir('POST', '/coordinador/imagenes', { form: f })
-  },
+  // ---- Archivos privados
+  archivo: (id) => descargarProtegido(`/archivos/${id}`),
+
+  // ---- Administración (Administrador general)
+  usuarios: () => get('/admin/usuarios'),
+  crearUsuario: (r) => post('/admin/usuarios', r),
+  actualizarUsuario: (id, r) => put(`/admin/usuarios/${id}`, r),
+  usuarioActivo: (id, activo) => put(`/admin/usuarios/${id}/activo`, { activo }),
+  usuarioClave: (id, nueva) => post(`/admin/usuarios/${id}/clave`, { nueva }),
+  sedesAdmin: () => get('/admin/sedes'),
+  crearSede: (r) => post('/admin/sedes', r),
+  actualizarSede: (slug, r) => put(`/admin/sedes/${enc(slug)}`, r),
+  activarSede: (slug, activo) => put(`/admin/sedes/${enc(slug)}/activa`, { activo }),
+  permisos: () => get('/admin/permisos'),
+  cambiarPermiso: (rol, permiso, habilitado) => put('/admin/permisos', { rol, permiso, habilitado }),
+  restablecerPermisos: () => post('/admin/permisos/restablecer'),
+  catalogosAdmin: (tipo) => get('/admin/catalogos', { tipo }),
+  crearCatalogo: (r) => post('/admin/catalogos', r),
+  actualizarCatalogo: (id, r) => put(`/admin/catalogos/${id}`, r),
+  parametros: () => get('/admin/parametros'),
+  cambiarParametro: (clave, valor) => put(`/admin/parametros/${enc(clave)}`, { valor }),
+  plantillas: () => get('/admin/plantillas'),
+  cambiarPlantilla: (codigo, r) => put(`/admin/plantillas/${enc(codigo)}`, r),
+  enviarResumen: () => post('/admin/resumen'),
 }

@@ -1,8 +1,7 @@
 -- =====================================================================================================
 -- USCO LabControl · 03 · Datos iniciales
--- Sede Neiva, cuentas de acceso y el inventario de los laboratorios. Contraseñas cifradas con BCrypt
--- (las contraseñas en texto plano están en el README). ⚠ En un servidor público, cámbialas o desactiva
--- estas cuentas después del primer ingreso.
+-- Sede Neiva, sus laboratorios y el inventario. NO crea usuarios: el primer Coordinador lo crea el backend
+-- con LABCONTROL_ADMIN_CORREO y LABCONTROL_ADMIN_CLAVE, y él crea las demás cuentas desde «Usuarios».
 -- Se puede ejecutar varias veces: INSERT IGNORE no duplica filas existentes.
 -- =====================================================================================================
 SET NAMES utf8mb4;
@@ -18,23 +17,6 @@ INSERT IGNORE INTO laboratorios (sede_id, nombre, ubicacion, descripcion, activo
   (1, 'Petróleos',   'Bloque de Ingeniería', 'Análisis de fluidos y propiedades de rocas', TRUE, NOW(6)),
   (1, 'Civil',       'Bloque de Ingeniería', 'Topografía, suelos y ensayos de materiales', TRUE, NOW(6)),
   (1, 'Agrícola',    'Sede Neiva',           'Suelos, agua y climatología', TRUE, NOW(6));
-
--- ---------------- Usuarios (rol, sede y contraseña BCrypt)
--- El Coordinador es general: sede_id NULL.
-INSERT IGNORE INTO usuarios (nombre, correo, password_hash, rol, documento, codigo_estudiantil, programa, activo, sede_id) VALUES
-  ('Administrador LabControl', 'admin@usco.edu.co', '$2a$10$F7MVvg27OZV7KgFN7kd.YemaH7rf9UxvoM2qe2ivnGu10UcvmTjDC', 'COORDINADOR', '1000000001', NULL, 'Coordinación de Laboratorios', TRUE, NULL),  -- Admin#USCO2026
-  ('Sandra Milena Vargas', 'coordinador@usco.edu.co', '$2a$10$7V8LnTBq0x45HZ.vrpA0BOSs/zeqz19mcsOjpVSDSNWuzDzmSW0yO', 'COORDINADOR', '36500100', NULL, 'Coordinación de Laboratorios', TRUE, NULL),  -- Coord#USCO2026
-  ('Daniel Felipe Gualtero', 'daniel.gualtero@usco.edu.co', '$2a$10$uIq3VrcT4AokbN80ldF8zOIpGyWP3li0HlX6Ik2awsw/ReKUxxOaG', 'COORDINADOR', '1075100001', NULL, 'Ingeniería de Software', TRUE, NULL),  -- Daniel#USCO2026
-  ('Carlos David Neira Vega', 'carlos.neira@usco.edu.co', '$2a$10$xWcWbUGWfUbGVk5d/FZM4.XaDUbND0fyYVu/AZJNyUBr1v5JlY7RC', 'AUXILIAR', '1075100002', NULL, 'Ingeniería de Software', TRUE, 1),  -- Carlos#USCO2026
-  ('Cesar Sneider Pimiento Torres', 'cesar.pimiento@usco.edu.co', '$2a$10$tbI4j.tU1gaFsjvGgJgOtOhhtenqOOQQ4uT0Vh5Psca9iwU4e9Ak2', 'ESTUDIANTE', '1075100003', '20221100003', 'Ingeniería de Software', TRUE, 1),  -- Cesar#USCO2026
-  ('Juan Pablo Trujillo', 'auxiliar@usco.edu.co', '$2a$10$OU4p2f2SZYPyjibDW2d11eHUAqUxSM4eoigHEFwkB9dFZtrQdobiW', 'AUXILIAR', '1075300101', NULL, 'Ing. Electrónica', TRUE, 1),  -- Aux#USCO2026
-  ('Marcela Ortiz', 'auxiliar2@usco.edu.co', '$2a$10$e/SB9Z.noNfPHwiEC4zn1u6Fa3tksGqyGvJCg3GCut7bcHCj00YLq', 'AUXILIAR', '1075300102', NULL, 'Ing. Civil', TRUE, 1),  -- Aux2#USCO2026
-  ('Mauricio Perdomo', 'docente@usco.edu.co', '$2a$10$PpPlmeNyLBZolz5VKGSy5uEErpEDthB5p31QVTPt0Itv9/RoJdw/.', 'DOCENTE', '36600200', NULL, 'Ing. Agrícola', TRUE, 1),  -- Doc#USCO2026
-  ('Laura Gómez', 'estudiante@usco.edu.co', '$2a$10$oeGJ05.PFnLUgbfShiqM0OHvOz3R1rUee5I803nVoWZPHyqsxa8K.', 'ESTUDIANTE', '1075123456', '20211100456', 'Ing. Electrónica', TRUE, 1),  -- Est#USCO2026
-  ('Andrés Ramírez', 'andres.ramirez@usco.edu.co', '$2a$10$Wd3jZucFFdQ99FKO6tWuh.j0Dbo7HGMFGlf5PZS5SER4b.LmSEJve', 'ESTUDIANTE', '1075200011', '20201100011', 'Ing. Civil', TRUE, 1),  -- Andres#USCO2026
-  ('Valentina Cuéllar', 'valentina.cuellar@usco.edu.co', '$2a$10$bUvikUGGOxbvvoSi4MCNBeAZOnUkEKa1kUCQQvHNX9nrFiIumkqWS', 'ESTUDIANTE', '1075200012', '20211100012', 'Ing. de Petróleos', TRUE, 1),  -- Valentina#USCO2026
-  ('Camila Rojas', 'camila.rojas@usco.edu.co', '$2a$10$ZLiwj.PPMbhAogYrno9vsOwjNDmHRkvz8kJicAabfaEQsgmXfYR6G', 'ESTUDIANTE', '1075200013', '20221100013', 'Ing. Agrícola', TRUE, 1),  -- Camila#USCO2026
-  ('Sebastián Medina', 'sebastian.medina@usco.edu.co', '$2a$10$TwVdcMAxfCpR2HddDsMAeufoOGcod5aWivOA6rObkGKZOXqd8FeX.', 'ESTUDIANTE', '1075200014', '20211100014', 'Ing. Electrónica', TRUE, 1);  -- Sebastian#USCO2026
 
 -- ---------------- Inventario de la Sede Neiva
 -- Series y ubicaciones son datos de referencia: reemplázalos por los del inventario físico.

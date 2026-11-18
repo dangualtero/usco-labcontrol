@@ -4,14 +4,15 @@ import { Eye, EyeOff, LogIn, TriangleAlert, CircleCheck, Radar, History, BellRin
 import { useAuth } from '../context/AuthContext.jsx'
 import { useSede } from '../context/SedeContext.jsx'
 import { REGEX_CORREO, homeDe } from '../lib/constantes.js'
+import { inicioDe } from '../lib/modulos.js'
 import { Campo } from '../components/ui.jsx'
 import ConexionBanner from '../components/ConexionBanner.jsx'
 import BotonTema from '../components/BotonTema.jsx'
 
 const PUNTOS = [
-  { icono: Radar, t: 'Disponibilidad actualizada', d: 'Sabe qué equipo está libre antes de ir al laboratorio.' },
-  { icono: History, t: 'Historial inmutable', d: 'Cada movimiento queda registrado y asociado a su responsable.' },
-  { icono: BellRing, t: 'Alertas de devolución', d: 'Avisos visuales automáticos de préstamos vencidos.' },
+  { icono: Radar, t: 'Inventario y hojas de vida', d: 'Equipos, insumos y mantenimientos de cada laboratorio al día.' },
+  { icono: History, t: 'Solicitudes con trazabilidad', d: 'Del monitor al coordinador y al Administrador, con cada decisión registrada.' },
+  { icono: BellRing, t: 'Alertas y seguimiento', d: 'Novedades por validar, mantenimientos y compromisos que vencen.' },
 ]
 
 export default function Login() {
@@ -39,8 +40,8 @@ export default function Login() {
   }, [])
 
   // Redirección automática según el rol que devuelve la base de datos
-  // Estudiantes y auxiliares van a SU sede; el Coordinador general entra a la sede de la URL.
-  if (usuario) return <Navigate to={homeDe(usuario.grupo, usuario.sede ?? slug)} replace />
+  // Coordinadores y monitores van a SU sede; el Administrador general entra a la sede de la URL.
+  if (usuario) return <Navigate to={homeDe(usuario.sede ?? slug, inicioDe(usuario))} replace />
 
   const validar = () => {
     const e = {}
@@ -59,7 +60,7 @@ export default function Login() {
     setCargando(true)
     try {
       const u = await iniciar({ email: correo.trim(), password: clave, recordar })
-      nav(homeDe(u.grupo, u.sede ?? slug), { replace: true })
+      nav(homeDe(u.sede ?? slug, inicioDe(u)), { replace: true })
     } catch (e) {
       // 401: «Credenciales inválidas» genérico (PS-08). Status 0: la API no responde (mensaje real de conexión).
       setErrorGlobal(e.message)
@@ -75,13 +76,13 @@ export default function Login() {
         <div className="pointer-events-none absolute -bottom-40 -left-32 h-[520px] w-[520px] rounded-full border-[44px] border-usco-dark/70" />
         <div className="pointer-events-none absolute -right-24 top-1/3 h-72 w-72 rounded-full border-[28px] border-oro-claro/10" />
         <div className="relative">
-          <img src="/logo-usco.png" alt="Universidad Surcolombiana" className="h-16 w-auto" />
+          <img src="/logo-usco.webp" width="481" height="128" alt="Universidad Surcolombiana" className="h-16 w-auto" />
           <div className="mt-2 h-1 w-24 rounded bg-oro-claro" />
         </div>
         <div className="relative max-w-xl">
           <p className="mb-3 inline-block rounded-full border border-oro-claro/50 px-3 py-1 text-xs font-bold uppercase tracking-widest text-oro-claro">Facultad de Ingeniería · {sede?.nombre ?? 'Sede Neiva'}</p>
           <h1 className="font-titulo text-5xl font-extrabold leading-[1.05] tracking-tight text-white xl:text-6xl">USCO <span className="text-oro-claro">LabControl</span></h1>
-          <p className="mt-4 text-lg text-white/90">Gestión y trazabilidad de préstamos de equipos en los laboratorios de Electrónica, Petróleos, Civil y Agrícola.</p>
+          <p className="mt-4 text-lg text-white/90">Gestión de laboratorios: caracterización, inventarios, mantenimientos, solicitudes, presupuesto y seguimiento.</p>
           <ul className="mt-9 space-y-4">
             {PUNTOS.map(({ icono: Ic, t, d }) => (
               <li key={t} className="flex items-start gap-3.5">
@@ -97,7 +98,7 @@ export default function Login() {
       {/* ---------- Formulario ---------- */}
       <main className="flex flex-col bg-fondo">
         <ConexionBanner />
-        <div className="bg-usco px-5 py-4 lg:hidden"><img src="/logo-usco.png" alt="Universidad Surcolombiana" className="h-11 w-auto" /></div>
+        <div className="bg-usco px-5 py-4 lg:hidden"><img src="/logo-usco.webp" width="481" height="128" alt="Universidad Surcolombiana" className="h-11 w-auto" /></div>
         <div className="h-1 bg-oro-claro lg:hidden" />
         <div className="flex justify-end px-5 pt-4 sm:px-10"><BotonTema variante="claro" conTexto /></div>
         <div className="flex flex-1 items-center justify-center px-5 pb-8 pt-2 sm:px-10">
@@ -153,10 +154,10 @@ export default function Login() {
             </form>
 
             <p className="mt-5 rounded-lg border border-slate-200 bg-white px-4 py-3 text-center text-sm text-pizarra">
-              ¿Eres estudiante y aún no tienes cuenta? <Link to={ruta('/registro')} className="font-bold text-usco hover:underline">Regístrate con tu correo institucional</Link>
+              Las cuentas las crea el Administrador general con su rol (Coordinador o Monitor) y sus laboratorios.
             </p>
-            <p className="mt-4 text-center text-xs text-slate-500">¿Olvidaste tu contraseña? Solicita su restablecimiento a la Coordinación de Laboratorios.</p>
-            <p className="mt-2 text-center text-[11px] text-slate-400">USCO LabControl · v1.1.0 · Conexión institucional</p>
+            <p className="mt-4 text-center text-xs text-slate-500">¿Olvidaste tu contraseña? Solicita su restablecimiento al Administrador de LabControl.</p>
+            <p className="mt-2 text-center text-[11px] text-slate-400">USCO LabControl · v2.0.0 · Conexión institucional</p>
           </div>
         </div>
       </main>

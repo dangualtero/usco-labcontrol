@@ -3,7 +3,6 @@ import { KeyRound } from 'lucide-react'
 import { api } from '../api/index.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useToast } from '../context/ToastContext.jsx'
-import { GRUPOS } from '../lib/constantes.js'
 import { Campo, ErrorCaja, Modal } from './ui.jsx'
 
 /** Mi cuenta: datos del perfil (solo lectura) y cambio de contraseña contra la API. */
@@ -37,9 +36,9 @@ export default function CuentaModal({ abierto, onCerrar }) {
       </>}>
       <dl className="mb-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-xl bg-slate-50 p-3 text-sm ring-1 ring-slate-200">
         <dt className="font-semibold text-pizarra">Nombre</dt><dd className="font-bold">{usuario?.nombre}</dd>
-        <dt className="font-semibold text-pizarra">Rol</dt><dd className="font-bold">{GRUPOS[usuario?.grupo]?.etiqueta} ({usuario?.rol})</dd>
-        {usuario?.programa && <><dt className="font-semibold text-pizarra">Programa</dt><dd className="font-bold">{usuario.programa}</dd></>}
-        {usuario?.codigoEstudiantil && <><dt className="font-semibold text-pizarra">Código</dt><dd className="font-mono font-bold">{usuario.codigoEstudiantil}</dd></>}
+        <dt className="font-semibold text-pizarra">Rol</dt><dd className="font-bold">{usuario?.rolTexto}</dd>
+        {usuario?.laboratorios?.length > 0 && <><dt className="font-semibold text-pizarra">Laboratorios</dt><dd className="font-bold">{usuario.laboratorios.map((l) => l.nombre).join(', ')}</dd></>}
+        {usuario?.programa && <><dt className="font-semibold text-pizarra">Dependencia</dt><dd className="font-bold">{usuario.programa}</dd></>}
       </dl>
       <form id="form-clave" onSubmit={guardar} className="space-y-3">
         <Campo etiqueta="Contraseña actual" htmlFor="c-actual"><input id="c-actual" type="password" autoComplete="current-password" className="input" value={actual} onChange={(e) => setActual(e.target.value)} /></Campo>

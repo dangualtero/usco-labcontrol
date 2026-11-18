@@ -6,46 +6,92 @@ import co.edu.usco.labcontrol.web.ApiException;
 import co.edu.usco.labcontrol.web.Dtos.*;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Set;
+import java.util.Locale;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Alta, edición y cambio de estado de equipos e insumos (CRUD de inventario). La baja lógica está en CoordinadorService.
- * La placa define el tipo: USCO-EQ-000 es un equipo (se presta), USCO-IN-000 es un insumo (se consume por cantidades).
+ * Inventario de los laboratorios: equipos (bienes con hoja de vida) e insumos (se consumen por cantidad).
+ * <ul>
+ *   <li>Consultar (INVENTARIO_CONSULTAR): todos los roles, cada uno en sus laboratorios.</li>
+ *   <li>Registrar, editar la ficha completa y dar de baja (INVENTARIO_GESTIONAR): Administrador y Coordinador.</li>
+ *   <li>Actualizar la información operativa (INVENTARIO_OPERATIVO): ubicación, estado físico y observaciones.</li>
+ * </ul>
+ * La placa define el tipo: USCO-EQ-000 es un equipo, USCO-IN-000 es un insumo.
  */
 @Service
 public class InventarioService {
-    private static final Set<String> ESTADOS_FISICOS = Set.of("Excelente", "Bueno", "Regular", "Deteriorado");
     /** Placas de inventario: equipos y insumos. */
     public static final Pattern FORMATO_INVENTARIO = Pattern.compile("^USCO-(EQ|IN)-\\d{3}$");
     public static final String MSG_FORMATO = "Usa el formato USCO-EQ-000 para equipos o USCO-IN-000 para insumos. Ejemplo: USCO-EQ-102";
     private static final BigDecimal MAXIMO = new BigDecimal("1000000000");
 
     private final EquipoRepository equipos;
-    private final UsuarioRepository usuarios;
     private final HistorialRepository historial;
-    private final Mapper mapper;
-    private final SedeContexto sedes;
+    private final MantenimientoRepository mantenimientos;
+    private final ReporteNovedadRepository novedades;
     private final LaboratorioService laboratorios;
+    private final ConfiguracionService configuracion;
+    private final Acceso acceso;
+    private final Mapper mapper;
 
-    public InventarioService(EquipoRepository equipos, UsuarioRepository usuarios, HistorialRepository historial, Mapper mapper,
-                             SedeContexto sedes, LaboratorioService laboratorios) {
-        this.equipos = equipos; this.usuarios = usuarios; this.historial = historial; this.mapper = mapper; this.sedes = sedes;
-        this.laboratorios = laboratorios;
+    public InventarioService(EquipoRepository equipos, HistorialRepository historial, MantenimientoRepository mantenimientos,
+                             ReporteNovedadRepository novedades, LaboratorioService laboratorios, ConfiguracionService configuracion,
+                             Acceso acceso, Mapper mapper) {
+        this.equipos = equipos; this.historial = historial; this.mantenimientos = mantenimientos; this.novedades = novedades;
+        this.laboratorios = laboratorios; this.configuracion = configuracion; this.acceso = acceso; this.mapper = mapper;
     }
+
+    // ------------------------------------------------------------------ Consulta
+
+    /**
+     * Inventario de los laboratorios de la cuenta. tipo: EQUIPO, INSUMO o vacío. bajas = incluir los dados de baja
+     * (solo con INVENTARIO_GESTIONAR).
+     */
+    @Transactional(readOnly = true)
+    public List<EquipoAdminDto> listar(Long actorId, String tipo, String laboratorio, String q, boolean bajas) {
+        Usuario actor = acceso.usuario(actorId);
+        acceso.exigir(actor, Permiso.INVENTARIO_CONSULTAR);
+        boolean conBajas = bajas && acceso.puede(actor, Permiso.INVENTARIO_GESTIONAR);
+        String nq = Texto.normalizar(q);
+        var nombres = acceso.nombres(actor);
+        return equipos.findBySedeIdOrderByLaboratorioAscPlacaAsc(acceso.sede(actor).getId()).stream()
+                .filter(e -> conBajas || e.isActivo())
+                .filter(e -> actor.esAdministrador() || nombres.contains(e.getLaboratorio().toLowerCase(Locale.ROOT)))
+                .filter(e -> Texto.vacio(tipo) || e.getTipo().name().equalsIgnoreCase(tipo.trim()))
+                .filter(e -> Texto.vacio(laboratorio) || e.getLaboratorio().equalsIgnoreCase(laboratorio.trim()))
+                .filter(e -> nq.isEmpty() || Texto.normalizar(e.getPlaca() + " " + e.getNombre() + " " + nz(e.getMarca()) + " "
+                        + nz(e.getModelo()) + " " + e.getCategoria() + " " + nz(e.getNumeroSerie())).contains(nq))
+                .map(mapper::equipoAdmin).toList();
+    }
+
+    /** Hoja de vida: ficha, mantenimientos, novedades y todos los eventos del historial del elemento. */
+    @Transactional(readOnly = true)
+    public HojaVidaDto hojaVida(Long actorId, String placa) {
+        Usuario actor = acceso.usuario(actorId);
+        acceso.exigir(actor, Permiso.INVENTARIO_CONSULTAR);
+        Equipo e = equipos.findByPlaca(placa == null ? "" : placa.trim().toUpperCase()).orElse(null);
+        if (e == null || !acceso.ve(actor, e)) throw ApiException.notFound("El elemento no existe en el inventario de tus laboratorios");
+        return new HojaVidaDto(mapper.equipoAdmin(e),
+                mantenimientos.findByEquipoIdOrderByCreadoEnDesc(e.getId()).stream().map(mapper::mantenimiento).toList(),
+                novedades.findByEquipoIdOrderByCreadoEnDesc(e.getId()).stream().map(mapper::novedad).toList(),
+                historial.dePlaca(e.getPlaca()).stream().limit(300).map(mapper::historial).toList());
+    }
+
+    // ------------------------------------------------------------------ Gestión (ficha completa)
 
     @Transactional
     public EquipoAdminDto crear(Long actorId, EquipoRequest r) {
-        Usuario actor = usuarios.findById(actorId).orElseThrow();
+        Usuario actor = acceso.usuario(actorId);
+        acceso.exigir(actor, Permiso.INVENTARIO_GESTIONAR);
         String placa = r.placa() == null ? "" : r.placa().trim().toUpperCase();
         if (!FORMATO_INVENTARIO.matcher(placa).matches()) throw ApiException.badRequest(MSG_FORMATO);
         if (equipos.existsByPlaca(placa)) throw ApiException.conflict("Ya existe un elemento con la placa " + placa);
         TipoElemento tipo = TipoElemento.dePlaca(placa);
         EstadoEquipo estado = tipo == TipoElemento.EQUIPO && "MANTENIMIENTO".equalsIgnoreCase(r.estado()) ? EstadoEquipo.MANTENIMIENTO : EstadoEquipo.DISPONIBLE;
-        Sede sede = sedes.de(actor);
-        Datos d = validar(r, sede, null);
+        Sede sede = acceso.sede(actor);
+        Datos d = validar(actor, r, null, null, null);
         Existencias x = existencias(tipo, r);
         Equipo e = new Equipo(placa, d.nombre, d.marca, d.modelo, d.serie, d.categoria, d.laboratorio, d.ubicacion,
                 d.descripcion, d.specs, d.accesorios, d.estadoFisico, d.foto, estado);
@@ -54,17 +100,16 @@ public class InventarioService {
         equipos.save(e);
         String que = tipo == TipoElemento.INSUMO ? "Insumo registrado (" + Mapper.cantidad(e.getCantidad(), e.getUnidad()) + ")" : "Equipo registrado";
         historial.save(new HistorialEvento(mapper.ahora(), "ALTA", e, null, null, actor.getNombre(),
-                que + " en el inventario de la " + sede.getNombre() + " (" + estado.name().toLowerCase() + ")"));
-        return new EquipoAdminDto(mapper.equipo(e), true, null, null, null);
+                que + " en el laboratorio " + e.getLaboratorio() + " (" + estado.texto().toLowerCase(Locale.ROOT) + ")"));
+        return mapper.equipoAdmin(e);
     }
 
     @Transactional
     public EquipoAdminDto actualizar(Long actorId, String placa, EquipoRequest r) {
-        Usuario actor = usuarios.findById(actorId).orElseThrow();
-        Sede sede = sedes.de(actor);
-        Equipo e = equipos.findActivoForUpdate(placa).filter(x -> sedes.pertenece(x, sede))
-                .orElseThrow(() -> ApiException.notFound("El equipo no existe en el inventario activo"));
-        Datos d = validar(r, sede, e.getLaboratorio());
+        Usuario actor = acceso.usuario(actorId);
+        acceso.exigir(actor, Permiso.INVENTARIO_GESTIONAR);
+        Equipo e = acceso.equipoParaEditar(actor, placa);
+        Datos d = validar(actor, r, e.getLaboratorio(), e.getCategoria(), e.getEstadoFisico());
         BigDecimal antes = e.getCantidad();
         Unidad unidadAntes = e.getUnidad();
         Existencias x = r.cantidad() == null && r.unidad() == null && r.cantidadReferencia() == null
@@ -77,30 +122,66 @@ public class InventarioService {
             detalle += ". Existencias: " + Mapper.cantidad(antes, unidadAntes) + " → " + Mapper.cantidad(e.getCantidad(), e.getUnidad());
         }
         historial.save(new HistorialEvento(mapper.ahora(), "ESTADO", e, null, null, actor.getNombre(), detalle));
-        return new EquipoAdminDto(mapper.equipo(e), true, null, null, null);
+        return mapper.equipoAdmin(e);
     }
 
-    /** Envía el equipo a mantenimiento o lo vuelve a poner disponible. Un equipo prestado no puede cambiar de estado. */
+    /** Información operativa (coordinador y monitor): ubicación, estado físico y observaciones. Queda en la hoja de vida. */
     @Transactional
-    public EquipoDto cambiarEstado(Long actorId, String placa, EstadoEquipoRequest r) {
-        Usuario actor = usuarios.findById(actorId).orElseThrow();
-        Equipo e = equipos.findActivoForUpdate(placa).filter(x -> sedes.pertenece(x, sedes.de(actor)))
-                .orElseThrow(() -> ApiException.notFound("El equipo no existe en el inventario activo"));
-        if (e.getEstado() == EstadoEquipo.PRESTADO) throw ApiException.conflict("No se puede cambiar el estado de un equipo que está prestado");
-        if (e.esInsumo()) throw ApiException.conflict("Los insumos no se envían a mantenimiento: ajusta sus existencias o repórtalo como novedad");
+    public EquipoAdminDto operativo(Long actorId, String placa, OperativoRequest r) {
+        Usuario actor = acceso.usuario(actorId);
+        acceso.exigir(actor, Permiso.INVENTARIO_OPERATIVO);
+        Equipo e = acceso.equipoParaEditar(actor, placa);
+        String fisico = Texto.limpio(r.estadoFisico()) == null ? e.getEstadoFisico()
+                : (r.estadoFisico().trim().equals(e.getEstadoFisico()) ? e.getEstadoFisico()
+                   : configuracion.validar(Catalogo.Tipo.ESTADO_FISICO, r.estadoFisico(), "el estado físico"));
+        String ubicacion = Texto.opcional(r.ubicacion(), 160, "La ubicación");
+        String obs = Texto.opcional(r.observaciones(), 1000, "Las observaciones");
+        StringBuilder cambios = new StringBuilder();
+        if (!eq(ubicacion, e.getUbicacion())) cambios.append("Ubicación: ").append(nz(ubicacion)).append(". ");
+        if (!eq(fisico, e.getEstadoFisico())) cambios.append("Estado físico: ").append(nz(e.getEstadoFisico())).append(" → ").append(nz(fisico)).append(". ");
+        if (!eq(obs, e.getObservaciones())) cambios.append("Observaciones: ").append(nz(obs));
+        if (cambios.isEmpty()) throw ApiException.badRequest("No hay cambios para guardar");
+        e.operativo(ubicacion, fisico, obs);
+        String det = cambios.toString().trim();
+        historial.save(new HistorialEvento(mapper.ahora(), "OPERATIVO", e, null, null, actor.getNombre(),
+                det.length() > 600 ? det.substring(0, 599) + "…" : det));
+        return mapper.equipoAdmin(e);
+    }
+
+    /** Estado del equipo: DISPONIBLE (operativo), MANTENIMIENTO o FUERA_SERVICIO. */
+    @Transactional
+    public EquipoAdminDto cambiarEstado(Long actorId, String placa, EstadoEquipoRequest r) {
+        Usuario actor = acceso.usuario(actorId);
+        acceso.exigirAlguno(actor, Permiso.INVENTARIO_GESTIONAR, Permiso.MANTENIMIENTO_GESTIONAR);
+        Equipo e = acceso.equipoParaEditar(actor, placa);
+        if (e.esInsumo()) throw ApiException.conflict("Los insumos no cambian de estado: ajusta sus existencias o reporta una novedad");
         EstadoEquipo nuevo;
-        if ("MANTENIMIENTO".equalsIgnoreCase(r.estado())) nuevo = EstadoEquipo.MANTENIMIENTO;
-        else if ("DISPONIBLE".equalsIgnoreCase(r.estado())) nuevo = EstadoEquipo.DISPONIBLE;
-        else throw ApiException.badRequest("Estado no válido: use DISPONIBLE o MANTENIMIENTO");
+        try { nuevo = EstadoEquipo.valueOf(r.estado() == null ? "" : r.estado().trim().toUpperCase()); }
+        catch (IllegalArgumentException ex) { throw ApiException.badRequest("Estado no válido: DISPONIBLE, MANTENIMIENTO o FUERA_SERVICIO"); }
         if (nuevo == e.getEstado()) throw ApiException.conflict("El equipo ya se encuentra en ese estado");
-        if (nuevo == EstadoEquipo.MANTENIMIENTO && (r.motivo() == null || r.motivo().trim().length() < 5)) {
-            throw ApiException.badRequest("Indique el motivo del mantenimiento");
-        }
+        String motivo = Texto.limpio(r.motivo());
+        if (nuevo != EstadoEquipo.DISPONIBLE && (motivo == null || motivo.length() < 5)) throw ApiException.badRequest("Indica el motivo (mínimo 5 caracteres)");
+        EstadoEquipo antes = e.getEstado();
         e.setEstado(nuevo);
         historial.save(new HistorialEvento(mapper.ahora(), "ESTADO", e, null, null, actor.getNombre(),
-                nuevo == EstadoEquipo.MANTENIMIENTO ? "Enviado a mantenimiento: " + r.motivo().trim() : "Mantenimiento finalizado: equipo disponible"));
-        return mapper.equipo(e);
+                antes.texto() + " → " + nuevo.texto() + (motivo == null ? "" : ": " + motivo)));
+        return mapper.equipoAdmin(e);
     }
+
+    /** Dar de baja = soft delete: sale del inventario activo pero el registro se conserva. */
+    @Transactional
+    public EquipoAdminDto baja(Long actorId, String placa, String motivo) {
+        Usuario actor = acceso.usuario(actorId);
+        acceso.exigir(actor, Permiso.INVENTARIO_GESTIONAR);
+        if (motivo == null || motivo.trim().length() < 5) throw ApiException.badRequest("Indique el motivo de la baja");
+        Equipo e = acceso.equipoParaEditar(actor, placa);
+        var ahora = mapper.ahora();
+        e.darDeBaja(motivo.trim(), ahora);
+        historial.save(new HistorialEvento(ahora, "BAJA", e, null, null, actor.getNombre(), "Baja (soft delete): " + motivo.trim()));
+        return mapper.equipoAdmin(e);
+    }
+
+    // ------------------------------------------------------------------ Validaciones
 
     private record Datos(String nombre, String marca, String modelo, String serie, String categoria, String laboratorio,
                          String ubicacion, String descripcion, String specs, String accesorios, String estadoFisico, String foto) {}
@@ -134,29 +215,32 @@ public class InventarioService {
         if (u == Unidad.UNIDAD && c.stripTrailingZeros().scale() > 0) throw ApiException.badRequest(campo + " en unidades debe ser un número entero (1, 2, 3…)");
     }
 
-    private Datos validar(EquipoRequest r, Sede sede, String laboratorioActual) {
-        String nombre = limpio(r.nombre());
-        if (nombre == null) throw ApiException.badRequest("El nombre del equipo es obligatorio");
-        String categoria = limpio(r.categoria());
-        if (categoria == null) throw ApiException.badRequest("La categoría es obligatoria");
-        String lab = laboratorios.validar(sede, limpio(r.laboratorio()), laboratorioActual);
-        String fisico = limpio(r.estadoFisico()) == null ? "Bueno" : limpio(r.estadoFisico());
-        if (!ESTADOS_FISICOS.contains(fisico)) throw ApiException.badRequest("Estado físico no válido");
-        String foto = limpio(r.fotoUrl());
+    private Datos validar(Usuario actor, EquipoRequest r, String labActual, String categoriaActual, String fisicoActual) {
+        String nombre = Texto.obligatorio(r.nombre(), 2, 120, "El nombre");
+        String cat = Texto.limpio(r.categoria());
+        if (cat == null) throw ApiException.badRequest("La categoría es obligatoria");
+        String categoria = cat.equals(categoriaActual) ? cat : configuracion.validar(Catalogo.Tipo.CATEGORIA_EQUIPO, cat, "la categoría");
+        String lab = laboratorios.validar(actor, Texto.limpio(r.laboratorio()), labActual);
+        String f = Texto.limpio(r.estadoFisico()) == null ? "Bueno" : r.estadoFisico().trim();
+        String fisico = f.equals(fisicoActual) ? f : configuracion.validar(Catalogo.Tipo.ESTADO_FISICO, f, "el estado físico");
+        String foto = Texto.limpio(r.fotoUrl());
         if (foto != null && !(foto.startsWith("/images/") || foto.startsWith("https://") || foto.startsWith("http://")
                 || ImagenService.esRutaPropia(foto))) {
             throw ApiException.badRequest("La fotografía debe ser una imagen subida, una URL http(s) o una ruta /images/…");
         }
         if (foto != null && foto.length() > 400) throw ApiException.badRequest("La URL de la fotografía es demasiado larga");
-        return new Datos(nombre, limpio(r.marca()), limpio(r.modelo()), limpio(r.numeroSerie()), categoria, lab,
-                limpio(r.ubicacion()), limpio(r.descripcion()), pipe(r.specs()), pipe(r.accesorios()), fisico, foto);
+        return new Datos(nombre, Texto.opcional(r.marca(), 60, "La marca"), Texto.opcional(r.modelo(), 60, "El modelo"),
+                Texto.opcional(r.numeroSerie(), 60, "El número de serie"), categoria, lab, Texto.opcional(r.ubicacion(), 160, "La ubicación"),
+                Texto.opcional(r.descripcion(), 500, "La descripción"), pipe(r.specs()), pipe(r.accesorios()), fisico, foto);
     }
-
-    private static String limpio(String s) { return s == null || s.isBlank() ? null : s.trim(); }
 
     private static String pipe(List<String> l) {
         if (l == null) return null;
         String j = l.stream().map(String::trim).filter(x -> !x.isEmpty()).map(x -> x.replace("|", "/")).reduce((a, b) -> a + "|" + b).orElse(null);
+        if (j != null && j.length() > 600) throw ApiException.badRequest("Las especificaciones o accesorios son demasiado largos (máximo 600 caracteres)");
         return j;
     }
+
+    private static String nz(String s) { return s == null ? "" : s; }
+    private static boolean eq(String a, String b) { return nz(a).equals(nz(b)); }
 }

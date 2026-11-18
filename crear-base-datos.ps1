@@ -1,11 +1,4 @@
-﻿# Crea (o vuelve a crear) la base de datos de USCO LabControl en el MySQL portátil (puerto 3307) a partir de los
-# scripts de backend/db:  00 usuario -> 01 esquema -> 02 triggers del historial -> 03 datos iniciales.
-#
-#   .\crear-base-datos.ps1                 # pide confirmación porque BORRA las tablas existentes
-#   .\crear-base-datos.ps1 -Confirmar      # sin preguntar (lo usa iniciar-mysql.ps1 la primera vez)
-#   .\crear-base-datos.ps1 -SinDatos       # solo estructura y triggers, sin usuarios ni equipos de ejemplo
-#   .\crear-base-datos.ps1 -ClaveRoot xxx  # si tu usuario root de MySQL tiene contraseña
-param([int]$Puerto = 3307, [switch]$Confirmar, [switch]$SinDatos, [string]$ClaveRoot = '')
+﻿param([int]$Puerto = 3307, [switch]$Confirmar, [switch]$SinDatos, [string]$ClaveRoot = '')
 
 $mysql = Join-Path $env:USERPROFILE 'tools\mysql-8.4.6-winx64\bin\mysql.exe'
 if (-not (Test-Path $mysql)) {

@@ -1,41 +1,34 @@
-import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
-import { Link } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useLocation, Link } from 'react-router-dom'
 import { LockKeyhole, Loader2 } from 'lucide-react'
 import { useAuth } from './context/AuthContext.jsx'
 import { SedeLayout, useSede } from './context/SedeContext.jsx'
 import Shell from './components/Shell.jsx'
+import ConexionBanner from './components/ConexionBanner.jsx'
 import Login from './pages/Login.jsx'
 import ElegirSede from './pages/ElegirSede.jsx'
-import Registro from './pages/Registro.jsx'
-import Catalogo from './pages/usuario/Catalogo.jsx'
-import MisReservas from './pages/usuario/MisReservas.jsx'
-import MiHistorial from './pages/usuario/MiHistorial.jsx'
-import Ventanilla from './pages/auxiliar/Ventanilla.jsx'
-import CierreTurno from './pages/auxiliar/CierreTurno.jsx'
-import Dashboard from './pages/coordinador/Dashboard.jsx'
-import HistorialInmutable from './pages/coordinador/HistorialInmutable.jsx'
-import Inventario from './pages/coordinador/Inventario.jsx'
-import Usuarios from './pages/coordinador/Usuarios.jsx'
-import Presupuesto from './pages/coordinador/Presupuesto.jsx'
-import Sedes from './pages/coordinador/Sedes.jsx'
-import InventarioAux from './pages/auxiliar/InventarioAux.jsx'
-import SolicitudesInsumo from './pages/auxiliar/SolicitudesInsumo.jsx'
-import Laboratorios from './pages/coordinador/Laboratorios.jsx'
-import Alertas from './pages/compartido/Alertas.jsx'
-import Reportes from './pages/compartido/Reportes.jsx'
-import { api } from './api/index.js'
-import ConexionBanner from './components/ConexionBanner.jsx'
-
-const REQUERIDO = {
-  USUARIO: 'Esta función es exclusiva de Estudiantes y Docentes',
-  AUXILIAR: 'Esta función requiere rol Auxiliar',
-  COORDINADOR: 'Disponible únicamente para Coordinador',
-}
+import Tablero from './pages/tablero/Tablero.jsx'
+import Alertas from './pages/tablero/Alertas.jsx'
+import Laboratorios from './pages/laboratorios/Laboratorios.jsx'
+import LaboratorioDetalle from './pages/laboratorios/LaboratorioDetalle.jsx'
+import Inventario from './pages/inventario/Inventario.jsx'
+import HojaVida from './pages/inventario/HojaVida.jsx'
+import Novedades from './pages/inventario/Novedades.jsx'
+import Mantenimientos from './pages/inventario/Mantenimientos.jsx'
+import Solicitudes from './pages/solicitudes/Solicitudes.jsx'
+import SolicitudDetalle from './pages/solicitudes/SolicitudDetalle.jsx'
+import Presupuesto from './pages/presupuesto/Presupuesto.jsx'
+import Seguimiento from './pages/seguimiento/Seguimiento.jsx'
+import Reportes from './pages/seguimiento/Reportes.jsx'
+import Historial from './pages/seguimiento/Historial.jsx'
+import Usuarios from './pages/admin/Usuarios.jsx'
+import Parametrizacion from './pages/admin/Parametrizacion.jsx'
+import Sedes from './pages/admin/Sedes.jsx'
+import { puede } from './lib/constantes.js'
+import { PERMISOS_DE_RUTA, modulosDe } from './lib/modulos.js'
 
 /**
- * Exige sesión dentro de /:sede. Un estudiante, docente o auxiliar solo puede estar en la URL de SU sede: si abre la de
- * otra (por ejemplo /pitalito siendo de Neiva) se le lleva a la misma pantalla en su sede. El Coordinador general
- * puede navegar por todas.
+ * Exige sesión dentro de /:sede. Coordinadores y monitores solo pueden estar en la URL de SU sede: si abren la de otra
+ * se les lleva a la misma pantalla en su sede. El Administrador general navega por todas.
  */
 function RequiereSesion() {
   const { usuario, validando } = useAuth()
@@ -56,35 +49,38 @@ function RequiereSesion() {
   return <Shell />
 }
 
-/** RBAC en el cliente (PS-02, PS-03). El servidor aplica la misma regla con Spring Security (RNF-03). */
-function RequiereRol({ grupo }) {
+/** Control de acceso en el cliente según la matriz de permisos. El servidor aplica la misma regla en cada acción. */
+function RequierePermiso({ modulo }) {
   const { usuario } = useAuth()
   const { inicio } = useSede()
-  if (usuario.grupo === grupo) return <Outlet />
+  if (puede(usuario, ...(PERMISOS_DE_RUTA[modulo] ?? []))) return <Outlet />
   return (
     <div className="card mx-auto mt-8 max-w-lg p-8 text-center aparecer" role="alert">
       <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-alerta-fondo"><LockKeyhole className="h-7 w-7 text-alerta-borde" aria-hidden="true" /></div>
       <h1 className="text-xl font-extrabold">Acceso restringido</h1>
-      <p className="mt-2 font-semibold text-slate-700">{REQUERIDO[grupo]}</p>
-      <p className="mt-1 text-sm text-pizarra">Su rol actual no tiene permiso para ver esta sección.</p>
-      <Link to={inicio(usuario.grupo)} className="btn-primary mt-6">Volver a mi panel principal</Link>
+      <p className="mt-2 font-semibold text-slate-700">Tu rol ({usuario?.rolTexto}) no tiene permiso para este módulo.</p>
+      <p className="mt-1 text-sm text-pizarra">Si lo necesitas, pídele al Administrador general que lo habilite en Parametrización → Permisos.</p>
+      <Link to={inicio(usuario)} className="btn-primary mt-6">Volver al inicio</Link>
     </div>
   )
 }
 
-// Vistas compartidas, configuradas para cada rol
-const AlertasAux = () => <Alertas cargar={api.alertasAux} enlaces={{ SOLICITUD_PENDIENTE: '/auxiliar/insumos', NOVEDAD: '/auxiliar/reportes', PRESTAMO_VENCIDO: '/auxiliar', AGOTADO: '/auxiliar/inventario', STOCK_BAJO: '/auxiliar/inventario', MANTENIMIENTO: '/auxiliar/inventario' }} />
-const AlertasCoord = () => <Alertas cargar={api.alertasCoord} enlaces={{ NOVEDAD: '/coordinador/reportes', AGOTADO: '/coordinador/inventario', STOCK_BAJO: '/coordinador/inventario', MANTENIMIENTO: '/coordinador/inventario', PRESTAMO_VENCIDO: '/coordinador/historial', SOLICITUD_PENDIENTE: '/coordinador/insumos' }} />
-const ReportesAux = () => <Reportes cargar={api.novedadesAux} seguimiento={api.seguimientoAux} seguir={api.seguirAux} />
-const ReportesCoord = () => <Reportes cargar={api.reportesTodos} version={api.reportesVersion} seguimiento={api.seguimientoCoord} seguir={api.seguirCoord}
-  reenviar={api.reenviarNovedad} enviarResumen={api.enviarResumen} />
-const InsumosCoord = () => <SolicitudesInsumo soloLectura cargar={api.solicitudesInsumoCoord} />
-
-/** /:sede sin más ruta → panel del rol o ingreso de esa sede. */
+/** /:sede sin más ruta → inicio de la cuenta o ingreso de esa sede. */
 function RaizSede() {
-  const { usuario } = useAuth()
+  const { usuario, cerrar } = useAuth()
   const { ruta, inicio } = useSede()
-  return <Navigate to={usuario ? inicio(usuario.grupo) : ruta('/login')} replace />
+  if (usuario && modulosDe(usuario).length === 0) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="card max-w-md p-8 text-center" role="alert">
+          <h1 className="text-xl font-extrabold">Sin módulos habilitados</h1>
+          <p className="mt-2 text-sm text-pizarra">Tu rol no tiene ningún permiso activo. Pídele al Administrador general que revise la matriz de permisos.</p>
+          <button className="btn-primary mt-6" onClick={() => cerrar('manual')}>Cerrar sesión</button>
+        </div>
+      </div>
+    )
+  }
+  return <Navigate to={usuario ? inicio(usuario) : ruta('/login')} replace />
 }
 
 /** /login (dirección antigua) → ingreso de la sede del usuario, o «Elige tu sede». */
@@ -92,6 +88,23 @@ function LoginSinSede() {
   const { usuario, home } = useAuth()
   return <Navigate to={usuario ? home : '/'} replace />
 }
+
+const RUTAS = [
+  ['/tablero', [['tablero', <Tablero key="t" />]]],
+  ['/alertas', [['alertas', <Alertas key="a" />]]],
+  ['/laboratorios', [['laboratorios', <Laboratorios key="l" />], ['laboratorios/:id', <LaboratorioDetalle key="ld" />]]],
+  ['/inventario', [['inventario', <Inventario key="i" />], ['inventario/:placa', <HojaVida key="hv" />]]],
+  ['/novedades', [['novedades', <Novedades key="n" />]]],
+  ['/mantenimientos', [['mantenimientos', <Mantenimientos key="m" />]]],
+  ['/solicitudes', [['solicitudes', <Solicitudes key="s" />], ['solicitudes/:id', <SolicitudDetalle key="sd" />]]],
+  ['/presupuesto', [['presupuesto', <Presupuesto key="p" />]]],
+  ['/seguimiento', [['seguimiento', <Seguimiento key="sg" />]]],
+  ['/reportes', [['reportes', <Reportes key="r" />]]],
+  ['/historial', [['historial', <Historial key="h" />]]],
+  ['/usuarios', [['usuarios', <Usuarios key="u" />]]],
+  ['/parametrizacion', [['parametrizacion', <Parametrizacion key="pz" />]]],
+  ['/sedes', [['sedes', <Sedes key="sd2" />]]],
+]
 
 export default function App() {
   return (
@@ -102,34 +115,12 @@ export default function App() {
       <Route path="/:sede" element={<SedeLayout />}>
         <Route index element={<RaizSede />} />
         <Route path="login" element={<Login />} />
-        <Route path="registro" element={<Registro />} />
         <Route element={<RequiereSesion />}>
-          <Route element={<RequiereRol grupo="USUARIO" />}>
-            <Route path="usuario" element={<Navigate to="catalogo" replace />} />
-            <Route path="usuario/catalogo" element={<Catalogo />} />
-            <Route path="usuario/reservas" element={<MisReservas />} />
-            <Route path="usuario/historial" element={<MiHistorial />} />
-          </Route>
-          <Route element={<RequiereRol grupo="AUXILIAR" />}>
-            <Route path="auxiliar" element={<Ventanilla />} />
-            <Route path="auxiliar/turno" element={<CierreTurno />} />
-            <Route path="auxiliar/inventario" element={<InventarioAux />} />
-            <Route path="auxiliar/insumos" element={<SolicitudesInsumo />} />
-            <Route path="auxiliar/reportes" element={<ReportesAux />} />
-            <Route path="auxiliar/alertas" element={<AlertasAux />} />
-          </Route>
-          <Route element={<RequiereRol grupo="COORDINADOR" />}>
-            <Route path="coordinador" element={<Dashboard />} />
-            <Route path="coordinador/historial" element={<HistorialInmutable />} />
-            <Route path="coordinador/inventario" element={<Inventario />} />
-            <Route path="coordinador/usuarios" element={<Usuarios />} />
-            <Route path="coordinador/presupuesto" element={<Presupuesto />} />
-            <Route path="coordinador/sedes" element={<Sedes />} />
-            <Route path="coordinador/reportes" element={<ReportesCoord />} />
-            <Route path="coordinador/alertas" element={<AlertasCoord />} />
-            <Route path="coordinador/laboratorios" element={<Laboratorios />} />
-            <Route path="coordinador/insumos" element={<InsumosCoord />} />
-          </Route>
+          {RUTAS.map(([modulo, rutas]) => (
+            <Route key={modulo} element={<RequierePermiso modulo={modulo} />}>
+              {rutas.map(([path, el]) => <Route key={path} path={path} element={el} />)}
+            </Route>
+          ))}
         </Route>
         <Route path="*" element={<RaizSede />} />
       </Route>

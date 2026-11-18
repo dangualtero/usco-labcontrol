@@ -3,11 +3,12 @@ import { Link, Outlet, useParams } from 'react-router-dom'
 import { Building2, Loader2, MapPinOff } from 'lucide-react'
 import { api, setSede } from '../api/index.js'
 import { homeDe } from '../lib/constantes.js'
+import { inicioDe } from '../lib/modulos.js'
 import ConexionBanner from '../components/ConexionBanner.jsx'
 
 /**
  * Sedes de la Universidad. La sede activa es el primer segmento de la URL (/neiva, /pitalito, /garzon…):
- * cada sede tiene su propio inventario, sus usuarios y auxiliares, y su presupuesto.
+ * cada sede tiene sus laboratorios, su inventario, sus coordinadores y monitores, y su presupuesto.
  */
 const ListaCtx = createContext(null)
 const SedeCtx = createContext(null)
@@ -35,11 +36,11 @@ export const refrescarSedes = () => window.dispatchEvent(new Event('labcontrol:s
 /**
  * Sede de la URL actual.
  *  - `slug` / `sede`: la sede activa ({ slug, nombre, ciudad, direccion, activa }).
- *  - `ruta('/coordinador')` → '/pitalito/coordinador'.
- *  - `inicio(grupo)` → panel principal del rol en esta sede.
+ *  - `ruta('/inventario')` → '/pitalito/inventario'.
+ *  - `inicio(usuario)` → primera pantalla de la cuenta en esta sede (normalmente el Tablero).
  */
 export function useSede() {
-  return useContext(SedeCtx) ?? { slug: null, sede: null, ruta: (p) => p, inicio: (g) => homeDe(g) }
+  return useContext(SedeCtx) ?? { slug: null, sede: null, ruta: (p) => p, inicio: (u) => homeDe(null, inicioDe(u)) }
 }
 
 /** Ruta /:sede — valida que la sede exista y la deja activa para todas las peticiones a la API. */
@@ -55,7 +56,7 @@ export function SedeLayout() {
     slug,
     sede,
     ruta: (p = '') => `/${slug}${p.startsWith('/') || p === '' ? p : `/${p}`}`,
-    inicio: (grupo) => homeDe(grupo, slug),
+    inicio: (u) => homeDe(slug, inicioDe(u)),
   }), [slug, sede])
 
   if (!sedes && !error) {

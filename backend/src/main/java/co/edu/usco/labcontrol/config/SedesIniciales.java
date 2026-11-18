@@ -5,7 +5,7 @@ import co.edu.usco.labcontrol.domain.Rol;
 import co.edu.usco.labcontrol.domain.Sede;
 import co.edu.usco.labcontrol.repo.EquipoRepository;
 import co.edu.usco.labcontrol.repo.LaboratorioRepository;
-import co.edu.usco.labcontrol.service.CoordinadorService;
+import co.edu.usco.labcontrol.service.LaboratorioService;
 import co.edu.usco.labcontrol.repo.SedeRepository;
 import co.edu.usco.labcontrol.repo.UsuarioRepository;
 import java.time.Clock;
@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Migración a sedes (se ejecuta en cada arranque y es idempotente):
  * <ol>
  *   <li>Si no existe ninguna sede, crea la Sede Neiva (sede principal).</li>
- *   <li>Los equipos y los usuarios (no coordinadores) que existían antes de las sedes quedan asignados a la sede principal.</li>
+ *   <li>Los equipos y los usuarios (no administradores) que existían antes de las sedes quedan asignados a la sede principal.</li>
  *   <li>Laboratorios: cada nombre de laboratorio que usan los equipos de una sede queda registrado en esa sede, y la sede
  *       principal arranca con los 4 de siempre si no tiene ninguno.</li>
  * </ol>
@@ -54,7 +54,7 @@ public class SedesIniciales implements ApplicationRunner {
         Sede principal = sedes.findFirstByOrderByIdAsc().orElseThrow();
         var sinSedeEq = equipos.findBySedeIsNull();
         sinSedeEq.forEach(e -> e.setSede(principal));
-        var sinSedeUs = usuarios.findBySedeIsNullAndRolNot(Rol.COORDINADOR);
+        var sinSedeUs = usuarios.findBySedeIsNullAndRolNot(Rol.ADMINISTRADOR);
         sinSedeUs.forEach(u -> u.setSede(principal));
         if (!sinSedeEq.isEmpty() || !sinSedeUs.isEmpty()) {
             log.info("Sedes: {} equipos y {} usuarios asignados a {}", sinSedeEq.size(), sinSedeUs.size(), principal.getNombre());
@@ -67,7 +67,7 @@ public class SedesIniciales implements ApplicationRunner {
         Sede principal = sedes.findFirstByOrderByIdAsc().orElseThrow();
         int creados = 0;
         if (laboratorios.findBySedeIdOrderByNombreAsc(principal.getId()).isEmpty()) {
-            for (String n : CoordinadorService.LABORATORIOS) { laboratorios.save(new Laboratorio(principal, n, null, null, ahora)); creados++; }
+            for (String n : LaboratorioService.LABORATORIOS) { laboratorios.save(new Laboratorio(principal, n, null, null, ahora)); creados++; }
         }
         for (Sede s : sedes.findAllByOrderByIdAsc()) {
             var usados = equipos.findBySedeIdOrderByLaboratorioAscPlacaAsc(s.getId()).stream()

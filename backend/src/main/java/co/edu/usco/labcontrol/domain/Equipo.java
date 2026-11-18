@@ -53,6 +53,8 @@ public class Equipo {
     private Unidad unidad = Unidad.UNIDAD;
     /** Cantidad «llena» (100 %). Con 25 % o menos el insumo aparece en Alertas. */
     private BigDecimal cantidadReferencia;
+    /** Información operativa (la actualizan coordinador y monitor). */
+    private String observaciones;
 
     protected Equipo() {}
 
@@ -84,6 +86,17 @@ public class Equipo {
     }
 
     public void cambiarLaboratorio(String laboratorio) { this.laboratorio = laboratorio; }
+
+    /** Información operativa: ubicación, estado físico y observaciones (coordinador y monitor). */
+    public void operativo(String ubicacion, String estadoFisico, String observaciones) {
+        this.ubicacion = ubicacion; this.estadoFisico = estadoFisico; this.observaciones = observaciones;
+    }
+
+    /** Ajuste de existencias (conteo físico validado). */
+    public void fijarCantidad(BigDecimal nueva) {
+        this.cantidad = nueva;
+        if (cantidadReferencia != null && nueva.compareTo(cantidadReferencia) > 0) this.cantidadReferencia = nueva;
+    }
 
     /** Descuenta un consumo (en la unidad del elemento). */
     public void descontar(BigDecimal consumo) {
@@ -130,4 +143,5 @@ public class Equipo {
     public BigDecimal getCantidad() { return cantidad; }
     public Unidad getUnidad() { return unidad == null ? Unidad.UNIDAD : unidad; }
     public BigDecimal getCantidadReferencia() { return cantidadReferencia; }
+    public String getObservaciones() { return observaciones; }
 }

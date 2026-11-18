@@ -100,6 +100,24 @@ public class PresupuestoService {
         return mapper.movimiento(m);
     }
 
+    /** Gasto de una solicitud contratada (lo registra el Administrador desde «Contratación»). */
+    @Transactional
+    public MovimientoDto gastoDeSolicitud(Usuario actor, co.edu.usco.labcontrol.domain.Solicitud s, long monto, String categoria) {
+        if (movimientos.findBySolicitudIdOrderByFechaDesc(s.getId()).stream().anyMatch(m -> !m.isAnulado() && m.getTipo() == Tipo.GASTO)) {
+            throw ApiException.conflict("La solicitud " + s.getCodigo() + " ya tiene un gasto registrado en el presupuesto");
+        }
+        String cat = categoria == null || categoria.isBlank() ? "Compra de equipos" : categoria.trim();
+        if (!CATEGORIAS.contains(cat) || "Asignación".equals(cat)) throw ApiException.badRequest("Categoría de gasto no válida");
+        long saldo = saldo(s.getSede());
+        if (monto > saldo) throw ApiException.conflict("Saldo insuficiente en la " + s.getSede().getNombre() + ": disponible " + pesos(saldo));
+        String concepto = ("Solicitud " + s.getCodigo() + " · " + s.getTitulo());
+        if (concepto.length() > 160) concepto = concepto.substring(0, 159) + "…";
+        var m = new MovimientoPresupuesto(s.getSede(), Tipo.GASTO, concepto, cat, monto,
+                s.getFechaContrato() == null ? mapper.ahora().toLocalDate() : s.getFechaContrato(), null, actor.getNombre(), mapper.ahora());
+        m.setSolicitud(s);
+        return mapper.movimiento(movimientos.save(m));
+    }
+
     /** Anular deja el movimiento visible (auditoría) pero sin efecto en el saldo. */
     @Transactional
     public MovimientoDto anular(Long actorId, Long id, String motivo) {

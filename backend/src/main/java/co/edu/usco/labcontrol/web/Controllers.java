@@ -1,43 +1,58 @@
 package co.edu.usco.labcontrol.web;
 
+import co.edu.usco.labcontrol.domain.Archivo;
+import co.edu.usco.labcontrol.domain.Permiso;
 import co.edu.usco.labcontrol.security.AuthUser;
 import co.edu.usco.labcontrol.service.*;
 import co.edu.usco.labcontrol.web.Dtos.*;
 import jakarta.validation.Valid;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import org.springframework.format.annotation.DateTimeFormat;
-import java.time.Duration;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
-/** Controladores de la API REST agrupados por rol (la autorización está en SecurityConfig). */
+/**
+ * API REST organizada por módulos. Todas las rutas (menos login, sedes públicas, imágenes y salud) exigen sesión; los
+ * permisos de cada acción se comprueban en los servicios según el rol y la matriz de permisos (Parametrización).
+ */
 public final class Controllers {
     private Controllers() {}
 
+    private static ResponseEntity<byte[]> csv(String contenido, String nombre) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nombre + "\"")
+                .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+                .body(contenido.getBytes(StandardCharsets.UTF_8));
+    }
+
+    // =====================================================================================================
+    // Público y sesión
+    // =====================================================================================================
     @RestController
     @RequestMapping("/api")
     public static class PublicoController {
         private final AuthService auth;
         private final SedeService sedes;
         private final ImagenService imagenes;
-        private final RegistroService registro;
-        public PublicoController(AuthService auth, SedeService sedes, ImagenService imagenes, RegistroService registro) {
-            this.auth = auth; this.sedes = sedes; this.imagenes = imagenes; this.registro = registro;
+        public PublicoController(AuthService auth, SedeService sedes, ImagenService imagenes) {
+            this.auth = auth; this.sedes = sedes; this.imagenes = imagenes;
         }
 
         /** Sedes (pública): la usa la pantalla «Elige tu sede» y la validación de /neiva, /pitalito… */
         @GetMapping("/sedes")
         public List<SedeDto> sedes() { return sedes.publicas(); }
 
-        /** Fotografía subida (pública para que la etiqueta img del catálogo la pueda mostrar). */
+        /** Fotografía de un equipo (pública para que la etiqueta img del inventario la pueda mostrar). */
         @GetMapping("/imagenes/{id}")
         public ResponseEntity<byte[]> imagen(@PathVariable String id) {
             return imagenes.buscar(id)
@@ -52,18 +67,7 @@ public final class Controllers {
         @PostMapping("/auth/login")
         public LoginResponse login(@Valid @RequestBody LoginRequest r) { return auth.login(r); }
 
-        /** Registro de estudiantes, paso 1: datos → código de 6 dígitos al correo @usco.edu.co. */
-        @PostMapping("/auth/registro")
-        public RegistroIniciadoDto registro(@RequestBody RegistroRequest r) { return registro.iniciar(r); }
-
-        /** Paso 2: código correcto → se crea la cuenta y se devuelve la sesión iniciada. */
-        @PostMapping("/auth/registro/verificar")
-        public LoginResponse verificar(@RequestBody VerificarRegistroRequest r) { return registro.verificar(r); }
-
-        @PostMapping("/auth/registro/reenviar")
-        public RegistroIniciadoDto reenviar(@RequestBody ReenviarCodigoRequest r) { return registro.reenviar(r); }
-
-        /** Datos del usuario de la sesión (el cliente lo usa para validar un token guardado). */
+        /** Datos de la cuenta de la sesión, con sus laboratorios y permisos. */
         @GetMapping("/auth/yo")
         public UsuarioDto yo(@AuthenticationPrincipal AuthUser u) { return auth.yo(u.id()); }
 
@@ -77,230 +81,35 @@ public final class Controllers {
         public Map<String, String> salud() { return Map.of("estado", "ok", "servicio", "USCO LabControl"); }
     }
 
+    // =====================================================================================================
+    // Tablero de control y parametrización (Administrador)
+    // =====================================================================================================
     @RestController
-    @RequestMapping("/api/equipos")
-    public static class CatalogoController {
-        private final CatalogoService catalogo;
-        private final LaboratorioService laboratorios;
-        public CatalogoController(CatalogoService catalogo, LaboratorioService laboratorios) {
-            this.catalogo = catalogo; this.laboratorios = laboratorios;
-        }
-
-        /** tipo: EQUIPO, INSUMO o vacío (todos). */
-        @GetMapping
-        public List<EquipoDto> listar(@AuthenticationPrincipal AuthUser u,
-                                      @RequestParam(required = false) String laboratorio,
-                                      @RequestParam(required = false) String categoria,
-                                      @RequestParam(required = false) String q,
-                                      @RequestParam(required = false) String tipo) {
-            return catalogo.listar(u.id(), laboratorio, categoria, q, tipo);
-        }
-
-        /** Laboratorios activos de la sede (filtros y formularios). */
-        @GetMapping("/laboratorios")
-        public List<String> laboratorios(@AuthenticationPrincipal AuthUser u) { return laboratorios.nombres(u.id()); }
-
-        @GetMapping("/{placa}")
-        public EquipoDetalleDto detalle(@AuthenticationPrincipal AuthUser u, @PathVariable String placa) { return catalogo.detalle(u.id(), placa); }
-    }
-
-    @RestController
-    @RequestMapping("/api/prestamos")
-    public static class UsuarioController {
-        private final PrestamoService servicio;
-        private final InsumoService insumos;
-        public UsuarioController(PrestamoService servicio, InsumoService insumos) { this.servicio = servicio; this.insumos = insumos; }
-
-        /** Pedir una cantidad de un insumo (el auxiliar la aprueba o la rechaza). */
-        @PostMapping("/insumos/{placa}/solicitudes")
-        public SolicitudInsumoDto solicitarInsumo(@AuthenticationPrincipal AuthUser u, @PathVariable String placa,
-                                                  @RequestBody SolicitudInsumoRequest r) {
-            return insumos.solicitar(u.id(), placa, r);
-        }
-
-        @GetMapping("/insumos/mis")
-        public List<SolicitudInsumoDto> misInsumos(@AuthenticationPrincipal AuthUser u) { return insumos.mias(u.id()); }
-
-        @DeleteMapping("/insumos/solicitudes/{id}")
-        public SolicitudInsumoDto cancelarInsumo(@AuthenticationPrincipal AuthUser u, @PathVariable Long id) { return insumos.cancelar(u.id(), id); }
-
-        @PostMapping("/reservas")
-        public PrestamoDto reservar(@AuthenticationPrincipal AuthUser u, @RequestBody ReservaRequest r) {
-            return servicio.reservar(u.id(), r);
-        }
-
-        @DeleteMapping("/reservas/{id}")
-        public PrestamoDto cancelar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id) {
-            return servicio.cancelarReserva(u.id(), id);
-        }
-
-        @GetMapping("/mis")
-        public List<PrestamoDto> mis(@AuthenticationPrincipal AuthUser u) { return servicio.misPrestamos(u.id()); }
-    }
-
-    @RestController
-    @RequestMapping("/api/ventanilla")
-    public static class VentanillaController {
-        private final PrestamoService servicio;
-        private final InventarioService inventario;
-        private final NovedadService novedades;
-        private final InsumoService insumos;
-        private final AlertaService alertas;
-        public VentanillaController(PrestamoService servicio, InventarioService inventario, NovedadService novedades,
-                                    InsumoService insumos, AlertaService alertas) {
-            this.servicio = servicio; this.inventario = inventario; this.novedades = novedades;
-            this.insumos = insumos; this.alertas = alertas;
-        }
-
-        // ---- Solicitudes de insumos: el auxiliar aprueba (se descuenta) o rechaza
-        @GetMapping("/insumos/solicitudes")
-        public List<SolicitudInsumoDto> solicitudesInsumo(@AuthenticationPrincipal AuthUser u) { return insumos.deSede(u.id()); }
-
-        @PostMapping("/insumos/solicitudes/{id}/aprobar")
-        public SolicitudInsumoDto aprobarInsumo(@AuthenticationPrincipal AuthUser u, @PathVariable Long id,
-                                                @RequestBody(required = false) ResolverSolicitudRequest r) {
-            return insumos.aprobar(u.id(), id, r == null ? null : r.respuesta());
-        }
-
-        @PostMapping("/insumos/solicitudes/{id}/rechazar")
-        public SolicitudInsumoDto rechazarInsumo(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody ResolverSolicitudRequest r) {
-            return insumos.rechazar(u.id(), id, r.respuesta());
-        }
-
-        @GetMapping("/alertas")
-        public List<AlertaDto> alertas(@AuthenticationPrincipal AuthUser u) { return alertas.listar(u.id()); }
-
-        @GetMapping("/novedades/{id}/seguimiento")
-        public List<SeguimientoDto> seguimiento(@AuthenticationPrincipal AuthUser u, @PathVariable Long id) { return novedades.seguimiento(u.id(), id); }
-
-        @PostMapping("/novedades/{id}/seguimiento")
-        public NovedadDto seguir(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody SeguimientoRequest r) {
-            return novedades.seguir(u.id(), id, r);
-        }
-
-        /** El auxiliar reporta que un equipo se agotó, se dañó, se perdió o falla: se avisa al correo institucional. */
-        @PostMapping("/equipos/{placa}/novedades")
-        public NovedadDto reportar(@AuthenticationPrincipal AuthUser u, @PathVariable String placa, @RequestBody NovedadRequest r) {
-            return novedades.reportar(u.id(), placa, r);
-        }
-
-        @GetMapping("/novedades")
-        public List<NovedadDto> novedades(@AuthenticationPrincipal AuthUser u) { return novedades.listar(u.id()); }
-
-        @GetMapping("/panel")
-        public PanelDto panel(@AuthenticationPrincipal AuthUser u) { return servicio.panel(u.id()); }
-
-        @GetMapping("/usuarios/{documento}/solicitudes")
-        public SolicitudesUsuarioDto solicitudes(@AuthenticationPrincipal AuthUser u, @PathVariable String documento) {
-            return servicio.solicitudes(u.id(), documento);
-        }
-
-        @PostMapping("/salida")
-        public PrestamoDto salida(@AuthenticationPrincipal AuthUser u, @RequestBody SalidaRequest r) {
-            return servicio.salida(u.id(), r);
-        }
-
-        @PostMapping("/reservas/{id}/rechazar")
-        public PrestamoDto rechazar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody RechazoRequest r) {
-            return servicio.rechazarReserva(u.id(), id, r.motivo());
-        }
-
-        @PostMapping("/entrada")
-        public EntradaResponse entrada(@AuthenticationPrincipal AuthUser u, @RequestBody EntradaRequest r) {
-            return servicio.entrada(u.id(), r);
-        }
-
-        @GetMapping("/cierre-turno")
-        public CierreTurnoDto cierre(@AuthenticationPrincipal AuthUser u) { return servicio.cierreTurno(u.id()); }
-
-        @PostMapping("/cierre-turno")
-        public TransferenciaResponse transferir(@AuthenticationPrincipal AuthUser u, @RequestBody TransferenciaRequest r) {
-            return servicio.transferirCustodia(u.id(), r.auxiliarDestinoId());
-        }
-
-        /** Inventario operativo: el auxiliar puede enviar a mantenimiento o reactivar un equipo. */
-        @PostMapping("/equipos/{placa}/estado")
-        public EquipoDto estado(@AuthenticationPrincipal AuthUser u, @PathVariable String placa, @RequestBody EstadoEquipoRequest r) {
-            return inventario.cambiarEstado(u.id(), placa, r);
-        }
-    }
-
-    @RestController
-    @RequestMapping("/api/coordinador")
-    public static class CoordinadorController {
-        private final CoordinadorService servicio;
-        private final InventarioService inventario;
+    @RequestMapping("/api/admin")
+    public static class AdminController {
         private final UsuariosService usuarios;
-        private final AlertaService alertas;
-        private final InsumoService insumos;
-        public CoordinadorController(CoordinadorService servicio, InventarioService inventario, UsuariosService usuarios,
-                                     AlertaService alertas, InsumoService insumos) {
-            this.servicio = servicio; this.inventario = inventario; this.usuarios = usuarios; this.alertas = alertas; this.insumos = insumos;
+        private final SedeService sedes;
+        private final PermisoService permisos;
+        private final ConfiguracionService configuracion;
+        private final ResumenDiarioService resumen;
+        private final Acceso acceso;
+        public AdminController(UsuariosService usuarios, SedeService sedes, PermisoService permisos, ConfiguracionService configuracion,
+                               ResumenDiarioService resumen, Acceso acceso) {
+            this.usuarios = usuarios; this.sedes = sedes; this.permisos = permisos; this.configuracion = configuracion;
+            this.resumen = resumen; this.acceso = acceso;
         }
 
-        @GetMapping("/alertas")
-        public List<AlertaDto> alertas(@AuthenticationPrincipal AuthUser u) { return alertas.listar(u.id()); }
-
-        /** Solicitudes de insumos de la sede (consulta; las atiende el auxiliar). */
-        @GetMapping("/insumos/solicitudes")
-        public List<SolicitudInsumoDto> solicitudesInsumo(@AuthenticationPrincipal AuthUser u) { return insumos.deSede(u.id()); }
-
-        @GetMapping("/kpis")
-        public KpisDto kpis(@AuthenticationPrincipal AuthUser u,
-                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
-                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
-            return servicio.kpis(u.id(), desde, hasta);
-        }
-
-        @GetMapping("/historial")
-        public List<HistorialDto> historial(@AuthenticationPrincipal AuthUser u,
-                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
-                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
-                                            @RequestParam(required = false) String laboratorio,
-                                            @RequestParam(required = false) String q) {
-            return servicio.historial(u.id(), desde, hasta, laboratorio, q);
-        }
-
-        @GetMapping(value = "/reporte.csv", produces = "text/csv;charset=UTF-8")
-        public ResponseEntity<byte[]> reporte(@AuthenticationPrincipal AuthUser u,
-                                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
-                                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
-                                              @RequestParam(required = false) String laboratorio) {
-            byte[] body = servicio.reporteCsv(u.id(), desde, hasta, laboratorio).getBytes(StandardCharsets.UTF_8);
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"reporte-uso-labcontrol.csv\"")
-                    .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
-                    .body(body);
-        }
-
-        // ---- Inventario (CRUD de equipos)
-        @GetMapping("/equipos")
-        public List<EquipoAdminDto> equipos(@AuthenticationPrincipal AuthUser u) { return servicio.equiposAdmin(u.id()); }
-
-        @PostMapping("/equipos")
-        public EquipoAdminDto crear(@AuthenticationPrincipal AuthUser u, @RequestBody EquipoRequest r) { return inventario.crear(u.id(), r); }
-
-        @PutMapping("/equipos/{placa}")
-        public EquipoAdminDto actualizar(@AuthenticationPrincipal AuthUser u, @PathVariable String placa, @RequestBody EquipoRequest r) {
-            return inventario.actualizar(u.id(), placa, r);
-        }
-
-        @PostMapping("/equipos/{placa}/estado")
-        public EquipoDto estado(@AuthenticationPrincipal AuthUser u, @PathVariable String placa, @RequestBody EstadoEquipoRequest r) {
-            return inventario.cambiarEstado(u.id(), placa, r);
-        }
-
-        @PostMapping("/equipos/{placa}/baja")
-        public EquipoAdminDto baja(@AuthenticationPrincipal AuthUser u, @PathVariable String placa, @RequestBody BajaRequest r) {
-            return servicio.baja(u.id(), placa, r.motivo());
-        }
-
-        // ---- Usuarios
+        // ---- Usuarios, roles y laboratorios asignados
         @GetMapping("/usuarios")
         public List<UsuarioAdminDto> usuarios(@AuthenticationPrincipal AuthUser u) { return usuarios.listar(u.id()); }
 
         @PostMapping("/usuarios")
         public UsuarioAdminDto crearUsuario(@AuthenticationPrincipal AuthUser u, @RequestBody UsuarioRequest r) { return usuarios.crear(u.id(), r); }
+
+        @PutMapping("/usuarios/{id}")
+        public UsuarioAdminDto actualizarUsuario(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody UsuarioActualizarRequest r) {
+            return usuarios.actualizar(u.id(), id, r);
+        }
 
         @PutMapping("/usuarios/{id}/activo")
         public UsuarioAdminDto activo(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody ActivoRequest r) {
@@ -308,123 +117,138 @@ public final class Controllers {
         }
 
         @PostMapping("/usuarios/{id}/clave")
-        public Map<String, String> clave(@PathVariable Long id, @RequestBody ClaveRequest r) {
-            usuarios.restablecerClave(id, r.nueva());
+        public Map<String, String> clave(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody ClaveRequest r) {
+            usuarios.restablecerClave(u.id(), id, r.nueva());
             return Map.of("mensaje", "Contraseña restablecida");
         }
-    }
 
-    /** Sedes (solo Coordinador general). */
-    @RestController
-    @RequestMapping("/api/coordinador/sedes")
-    public static class SedesController {
-        private final SedeService sedes;
-        public SedesController(SedeService sedes) { this.sedes = sedes; }
-
-        @GetMapping
-        public List<SedeAdminDto> listar() { return sedes.listarAdmin(); }
-
-        @PostMapping
-        public SedeAdminDto crear(@RequestBody SedeRequest r) { return sedes.crear(r); }
-
-        @PutMapping("/{slug}")
-        public SedeAdminDto actualizar(@PathVariable String slug, @RequestBody SedeRequest r) { return sedes.actualizar(slug, r); }
-
-        @PutMapping("/{slug}/activa")
-        public SedeAdminDto activa(@PathVariable String slug, @RequestBody ActivoRequest r) { return sedes.activar(slug, r.activo()); }
-    }
-
-    /** Presupuesto por sede (solo Coordinador general). La sede llega en la cabecera X-Sede. */
-    @RestController
-    @RequestMapping("/api/coordinador/presupuesto")
-    public static class PresupuestoController {
-        private final PresupuestoService presupuesto;
-        public PresupuestoController(PresupuestoService presupuesto) { this.presupuesto = presupuesto; }
-
-        @GetMapping
-        public PresupuestoDto sede(@AuthenticationPrincipal AuthUser u) { return presupuesto.deSede(u.id()); }
-
-        @GetMapping("/resumen")
-        public ResumenPresupuestoDto resumen() { return presupuesto.resumen(); }
-
-        @GetMapping("/categorias")
-        public List<String> categorias() { return PresupuestoService.CATEGORIAS; }
-
-        @PostMapping("/movimientos")
-        public MovimientoDto registrar(@AuthenticationPrincipal AuthUser u, @RequestBody MovimientoRequest r) {
-            return presupuesto.registrar(u.id(), r);
+        // ---- Sedes
+        @GetMapping("/sedes")
+        public List<SedeAdminDto> sedes(@AuthenticationPrincipal AuthUser u) {
+            acceso.exigir(u.id(), Permiso.SEDES_GESTIONAR);
+            return sedes.listarAdmin();
         }
 
-        @PostMapping("/movimientos/{id}/anular")
-        public MovimientoDto anular(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody AnularRequest r) {
-            return presupuesto.anular(u.id(), id, r.motivo());
-        }
-    }
-
-    /** Subida de fotografías desde el computador o el celular (solo Coordinador). */
-    @RestController
-    @RequestMapping("/api/coordinador/imagenes")
-    public static class ImagenesController {
-        private final ImagenService imagenes;
-        public ImagenesController(ImagenService imagenes) { this.imagenes = imagenes; }
-
-        @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-        public ImagenSubidaDto subir(@AuthenticationPrincipal AuthUser u, @RequestParam("archivo") MultipartFile archivo) {
-            return imagenes.subir(u.id(), archivo);
-        }
-    }
-
-    /** Novedades reportadas por los auxiliares de la sede abierta, con el resultado del aviso (Coordinador). */
-    @RestController
-    @RequestMapping("/api/coordinador/novedades")
-    public static class NovedadesController {
-        private final NovedadService novedades;
-        private final ResumenDiarioService resumen;
-        private final SedeContexto sedes;
-        public NovedadesController(NovedadService novedades, ResumenDiarioService resumen, SedeContexto sedes) {
-            this.novedades = novedades; this.resumen = resumen; this.sedes = sedes;
+        @PostMapping("/sedes")
+        public SedeAdminDto crearSede(@AuthenticationPrincipal AuthUser u, @RequestBody SedeRequest r) {
+            acceso.exigir(u.id(), Permiso.SEDES_GESTIONAR);
+            return sedes.crear(r);
         }
 
-        @GetMapping
-        public List<NovedadDto> listar(@AuthenticationPrincipal AuthUser u) { return novedades.listar(u.id()); }
-
-        /** Vista «Reportes»: todos los reportes de la sede. */
-        @GetMapping("/todas")
-        public List<NovedadDto> todas(@AuthenticationPrincipal AuthUser u) { return novedades.todos(u.id()); }
-
-        /** Huella liviana para actualizar la vista en tiempo real (el navegador la consulta cada pocos segundos). */
-        @GetMapping("/version")
-        public VersionReportesDto version(@AuthenticationPrincipal AuthUser u) { return novedades.version(u.id()); }
-
-        /** ahora=true: envía el correo de inmediato aunque la prioridad no sea ALTA. */
-        @PostMapping("/{id}/reenviar")
-        public NovedadDto reenviar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id,
-                                   @RequestParam(defaultValue = "false") boolean ahora) {
-            return novedades.reenviar(u.id(), id, ahora);
+        @PutMapping("/sedes/{slug}")
+        public SedeAdminDto actualizarSede(@AuthenticationPrincipal AuthUser u, @PathVariable String slug, @RequestBody SedeRequest r) {
+            acceso.exigir(u.id(), Permiso.SEDES_GESTIONAR);
+            return sedes.actualizar(slug, r);
         }
 
-        @GetMapping("/{id}/seguimiento")
-        public List<SeguimientoDto> seguimiento(@AuthenticationPrincipal AuthUser u, @PathVariable Long id) { return novedades.seguimiento(u.id(), id); }
+        @PutMapping("/sedes/{slug}/activa")
+        public SedeAdminDto activarSede(@AuthenticationPrincipal AuthUser u, @PathVariable String slug, @RequestBody ActivoRequest r) {
+            acceso.exigir(u.id(), Permiso.SEDES_GESTIONAR);
+            return sedes.activar(slug, r.activo());
+        }
 
-        @PostMapping("/{id}/seguimiento")
-        public NovedadDto seguir(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody SeguimientoRequest r) {
-            return novedades.seguir(u.id(), id, r);
+        // ---- Matriz de permisos por rol
+        @GetMapping("/permisos")
+        public List<PermisoDto> permisos(@AuthenticationPrincipal AuthUser u) {
+            acceso.exigir(u.id(), Permiso.PARAMETRIZAR);
+            return permisos.listar();
+        }
+
+        @PutMapping("/permisos")
+        public List<PermisoDto> cambiarPermiso(@AuthenticationPrincipal AuthUser u, @RequestBody PermisoCambioRequest r) {
+            acceso.exigir(u.id(), Permiso.PARAMETRIZAR);
+            return permisos.cambiar(r);
+        }
+
+        @PostMapping("/permisos/restablecer")
+        public List<PermisoDto> restablecerPermisos(@AuthenticationPrincipal AuthUser u) {
+            acceso.exigir(u.id(), Permiso.PARAMETRIZAR);
+            return permisos.restablecer();
+        }
+
+        // ---- Catálogos, parámetros y plantillas
+        @GetMapping("/catalogos")
+        public List<CatalogoDto> catalogos(@AuthenticationPrincipal AuthUser u, @RequestParam(required = false) String tipo) {
+            acceso.exigir(u.id(), Permiso.PARAMETRIZAR);
+            return configuracion.catalogos(tipo);
+        }
+
+        @PostMapping("/catalogos")
+        public CatalogoDto crearCatalogo(@AuthenticationPrincipal AuthUser u, @RequestBody CatalogoRequest r) {
+            acceso.exigir(u.id(), Permiso.PARAMETRIZAR);
+            return configuracion.crearCatalogo(r);
+        }
+
+        @PutMapping("/catalogos/{id}")
+        public CatalogoDto actualizarCatalogo(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody CatalogoRequest r) {
+            acceso.exigir(u.id(), Permiso.PARAMETRIZAR);
+            return configuracion.actualizarCatalogo(id, r);
+        }
+
+        @GetMapping("/parametros")
+        public List<ParametroDto> parametros(@AuthenticationPrincipal AuthUser u) {
+            acceso.exigir(u.id(), Permiso.PARAMETRIZAR);
+            return configuracion.parametros();
+        }
+
+        @PutMapping("/parametros/{clave}")
+        public List<ParametroDto> cambiarParametro(@AuthenticationPrincipal AuthUser u, @PathVariable String clave, @RequestBody ParametroRequest r) {
+            acceso.exigir(u.id(), Permiso.PARAMETRIZAR);
+            return configuracion.cambiarParametro(clave, r);
+        }
+
+        @GetMapping("/plantillas")
+        public List<PlantillaDto> plantillas(@AuthenticationPrincipal AuthUser u) {
+            acceso.exigir(u.id(), Permiso.PARAMETRIZAR);
+            return configuracion.plantillas();
+        }
+
+        @PutMapping("/plantillas/{codigo}")
+        public PlantillaDto cambiarPlantilla(@AuthenticationPrincipal AuthUser u, @PathVariable String codigo, @RequestBody PlantillaRequest r) {
+            acceso.exigir(u.id(), Permiso.PARAMETRIZAR);
+            return configuracion.cambiarPlantilla(codigo, r);
         }
 
         /** Envía ya el resumen diario de la sede abierta (para probarlo sin esperar a la hora programada). */
         @PostMapping("/resumen")
-        public ResumenEnviadoDto enviarResumen(@AuthenticationPrincipal AuthUser u) { return resumen.enviar(sedes.de(u.id()).getId(), true); }
+        public ResumenEnviadoDto enviarResumen(@AuthenticationPrincipal AuthUser u) {
+            var actor = acceso.exigir(u.id(), Permiso.PARAMETRIZAR);
+            return resumen.enviar(acceso.sede(actor).getId(), true);
+        }
     }
 
-    /** Laboratorios de la sede abierta (solo Coordinador). */
+    /** Valores activos de un catálogo, para los formularios de cualquier rol. */
     @RestController
-    @RequestMapping("/api/coordinador/laboratorios")
+    @RequestMapping("/api/catalogos")
+    public static class CatalogosController {
+        private final ConfiguracionService configuracion;
+        private final Acceso acceso;
+        public CatalogosController(ConfiguracionService configuracion, Acceso acceso) { this.configuracion = configuracion; this.acceso = acceso; }
+
+        @GetMapping
+        public Map<String, List<String>> todos(@AuthenticationPrincipal AuthUser u) {
+            acceso.usuario(u.id());
+            Map<String, List<String>> out = new java.util.LinkedHashMap<>();
+            for (var t : co.edu.usco.labcontrol.domain.Catalogo.Tipo.values()) out.put(t.name(), configuracion.valores(t));
+            return out;
+        }
+    }
+
+    // =====================================================================================================
+    // Laboratorios: caracterización y documentación
+    // =====================================================================================================
+    @RestController
+    @RequestMapping("/api/laboratorios")
     public static class LaboratoriosController {
         private final LaboratorioService laboratorios;
         public LaboratoriosController(LaboratorioService laboratorios) { this.laboratorios = laboratorios; }
 
         @GetMapping
         public List<LaboratorioDto> listar(@AuthenticationPrincipal AuthUser u) { return laboratorios.listar(u.id()); }
+
+        /** Id y nombre de los laboratorios visibles (filtros y formularios). */
+        @GetMapping("/referencias")
+        public List<LaboratorioRefDto> referencias(@AuthenticationPrincipal AuthUser u) { return laboratorios.referencias(u.id()); }
 
         @PostMapping
         public LaboratorioDto crear(@AuthenticationPrincipal AuthUser u, @RequestBody LaboratorioRequest r) { return laboratorios.crear(u.id(), r); }
@@ -437,6 +261,397 @@ public final class Controllers {
         @PutMapping("/{id}/activo")
         public LaboratorioDto activo(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody ActivoRequest r) {
             return laboratorios.activar(u.id(), id, r.activo());
+        }
+
+        @GetMapping("/{id}")
+        public CaracterizacionDto detalle(@AuthenticationPrincipal AuthUser u, @PathVariable Long id) { return laboratorios.detalle(u.id(), id); }
+
+        @PutMapping("/{id}/caracterizacion")
+        public CaracterizacionDto caracterizar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody CaracterizacionRequest r) {
+            return laboratorios.caracterizar(u.id(), id, r);
+        }
+
+        @PostMapping(value = "/{id}/documentos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        public CaracterizacionDto documento(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestParam String tipo,
+                                            @RequestParam String titulo, @RequestParam(required = false) String descripcion,
+                                            @RequestParam("archivo") MultipartFile archivo) {
+            return laboratorios.agregarDocumento(u.id(), id, tipo, titulo, descripcion, archivo);
+        }
+
+        @DeleteMapping("/{id}/documentos/{documentoId}")
+        public CaracterizacionDto quitarDocumento(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @PathVariable Long documentoId) {
+            return laboratorios.quitarDocumento(u.id(), id, documentoId);
+        }
+    }
+
+    // =====================================================================================================
+    // Inventarios y mantenimientos
+    // =====================================================================================================
+    @RestController
+    @RequestMapping("/api/inventario")
+    public static class InventarioController {
+        private final InventarioService inventario;
+        private final ImagenService imagenes;
+        private final Acceso acceso;
+        public InventarioController(InventarioService inventario, ImagenService imagenes, Acceso acceso) {
+            this.inventario = inventario; this.imagenes = imagenes; this.acceso = acceso;
+        }
+
+        /** tipo: EQUIPO, INSUMO o vacío. bajas: incluir los dados de baja (requiere gestionar el inventario). */
+        @GetMapping
+        public List<EquipoAdminDto> listar(@AuthenticationPrincipal AuthUser u, @RequestParam(required = false) String tipo,
+                                           @RequestParam(required = false) String laboratorio, @RequestParam(required = false) String q,
+                                           @RequestParam(defaultValue = "false") boolean bajas) {
+            return inventario.listar(u.id(), tipo, laboratorio, q, bajas);
+        }
+
+        @GetMapping("/{placa}")
+        public HojaVidaDto hojaVida(@AuthenticationPrincipal AuthUser u, @PathVariable String placa) { return inventario.hojaVida(u.id(), placa); }
+
+        @PostMapping
+        public EquipoAdminDto crear(@AuthenticationPrincipal AuthUser u, @RequestBody EquipoRequest r) { return inventario.crear(u.id(), r); }
+
+        @PutMapping("/{placa}")
+        public EquipoAdminDto actualizar(@AuthenticationPrincipal AuthUser u, @PathVariable String placa, @RequestBody EquipoRequest r) {
+            return inventario.actualizar(u.id(), placa, r);
+        }
+
+        @PutMapping("/{placa}/operativo")
+        public EquipoAdminDto operativo(@AuthenticationPrincipal AuthUser u, @PathVariable String placa, @RequestBody OperativoRequest r) {
+            return inventario.operativo(u.id(), placa, r);
+        }
+
+        @PostMapping("/{placa}/estado")
+        public EquipoAdminDto estado(@AuthenticationPrincipal AuthUser u, @PathVariable String placa, @RequestBody EstadoEquipoRequest r) {
+            return inventario.cambiarEstado(u.id(), placa, r);
+        }
+
+        @PostMapping("/{placa}/baja")
+        public EquipoAdminDto baja(@AuthenticationPrincipal AuthUser u, @PathVariable String placa, @RequestBody BajaRequest r) {
+            return inventario.baja(u.id(), placa, r.motivo());
+        }
+
+        /** Fotografía del equipo desde el computador o el celular. */
+        @PostMapping(value = "/imagenes", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        public ImagenSubidaDto subirImagen(@AuthenticationPrincipal AuthUser u, @RequestParam("archivo") MultipartFile archivo) {
+            acceso.exigir(u.id(), Permiso.INVENTARIO_GESTIONAR);
+            return imagenes.subir(u.id(), archivo);
+        }
+    }
+
+    @RestController
+    @RequestMapping("/api/mantenimientos")
+    public static class MantenimientosController {
+        private final MantenimientoService mantenimientos;
+        public MantenimientosController(MantenimientoService mantenimientos) { this.mantenimientos = mantenimientos; }
+
+        /** estado: REQUERIDO, PROGRAMADO, EN_EJECUCION, REALIZADO, CANCELADO, ABIERTOS o vacío. */
+        @GetMapping
+        public List<MantenimientoDto> listar(@AuthenticationPrincipal AuthUser u, @RequestParam(required = false) String estado,
+                                             @RequestParam(required = false) String laboratorio, @RequestParam(required = false) String placa) {
+            return mantenimientos.listar(u.id(), estado, laboratorio, placa);
+        }
+
+        @PostMapping
+        public MantenimientoDto crear(@AuthenticationPrincipal AuthUser u, @RequestBody MantenimientoRequest r) { return mantenimientos.crear(u.id(), r); }
+
+        @PutMapping("/{id}")
+        public MantenimientoDto actualizar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody MantenimientoRequest r) {
+            return mantenimientos.actualizar(u.id(), id, r);
+        }
+
+        @PostMapping("/{id}/estado")
+        public MantenimientoDto estado(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody MantenimientoEstadoRequest r) {
+            return mantenimientos.cambiarEstado(u.id(), id, r);
+        }
+    }
+
+    /** Novedades: registro preliminar (monitor) y validación (coordinador). */
+    @RestController
+    @RequestMapping("/api/novedades")
+    public static class NovedadesController {
+        private final NovedadService novedades;
+        public NovedadesController(NovedadService novedades) { this.novedades = novedades; }
+
+        /** validacion: PENDIENTE, VALIDADA, RECHAZADA o vacío. */
+        @GetMapping
+        public List<NovedadDto> listar(@AuthenticationPrincipal AuthUser u, @RequestParam(required = false) String validacion,
+                                       @RequestParam(required = false) String laboratorio, @RequestParam(required = false) String placa) {
+            return novedades.listar(u.id(), validacion, laboratorio, placa);
+        }
+
+        /** Huella de las novedades: el navegador la consulta cada pocos segundos y recarga solo si cambió. */
+        @GetMapping("/version")
+        public VersionReportesDto version(@AuthenticationPrincipal AuthUser u) { return novedades.version(u.id()); }
+
+        /** Registro con fotografías y soportes (multipart: tipo, descripcion, mantenimiento, cantidad, unidad, archivos). */
+        @PostMapping(value = "/{placa}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        public NovedadDto reportar(@AuthenticationPrincipal AuthUser u, @PathVariable String placa, @RequestParam String tipo,
+                                   @RequestParam String descripcion, @RequestParam(required = false) Boolean mantenimiento,
+                                   @RequestParam(required = false) java.math.BigDecimal cantidad, @RequestParam(required = false) String unidad,
+                                   @RequestParam(value = "archivos", required = false) List<MultipartFile> archivos) {
+            return novedades.reportar(u.id(), placa, new NovedadRequest(tipo, descripcion, mantenimiento, cantidad, unidad), archivos);
+        }
+
+        /** Registro sin archivos (JSON). */
+        @PostMapping(value = "/{placa}", consumes = MediaType.APPLICATION_JSON_VALUE)
+        public NovedadDto reportarJson(@AuthenticationPrincipal AuthUser u, @PathVariable String placa, @RequestBody NovedadRequest r) {
+            return novedades.reportar(u.id(), placa, r, List.of());
+        }
+
+        @PostMapping("/{id}/validar")
+        public NovedadDto validar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody(required = false) ValidarNovedadRequest r) {
+            return novedades.validar(u.id(), id, r);
+        }
+
+        @PostMapping("/{id}/rechazar")
+        public NovedadDto rechazar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody ValidarNovedadRequest r) {
+            return novedades.rechazar(u.id(), id, r);
+        }
+
+        /** ahora=true: envía el correo de inmediato aunque la prioridad no sea ALTA. */
+        @PostMapping("/{id}/reenviar")
+        public NovedadDto reenviar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestParam(defaultValue = "false") boolean ahora) {
+            return novedades.reenviar(u.id(), id, ahora);
+        }
+
+        @GetMapping("/{id}/seguimiento")
+        public List<SeguimientoDto> seguimiento(@AuthenticationPrincipal AuthUser u, @PathVariable Long id) { return novedades.seguimiento(u.id(), id); }
+
+        @PostMapping("/{id}/seguimiento")
+        public NovedadDto seguir(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody SeguimientoRequest r) {
+            return novedades.seguir(u.id(), id, r);
+        }
+    }
+
+    // =====================================================================================================
+    // Solicitudes y requerimientos
+    // =====================================================================================================
+    @RestController
+    @RequestMapping("/api/solicitudes")
+    public static class SolicitudesController {
+        private final SolicitudService solicitudes;
+        public SolicitudesController(SolicitudService solicitudes) { this.solicitudes = solicitudes; }
+
+        /** estado: un estado, ABIERTAS o vacío. */
+        @GetMapping
+        public List<SolicitudResumenDto> listar(@AuthenticationPrincipal AuthUser u, @RequestParam(required = false) String estado,
+                                                @RequestParam(required = false) Long laboratorioId, @RequestParam(required = false) String q) {
+            return solicitudes.listar(u.id(), estado, laboratorioId, q);
+        }
+
+        @GetMapping("/{id}")
+        public SolicitudDetalleDto detalle(@AuthenticationPrincipal AuthUser u, @PathVariable Long id) { return solicitudes.detalle(u.id(), id); }
+
+        @PostMapping
+        public SolicitudDetalleDto crear(@AuthenticationPrincipal AuthUser u, @RequestBody SolicitudRequest r) { return solicitudes.crear(u.id(), r); }
+
+        @PutMapping("/{id}")
+        public SolicitudDetalleDto actualizar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody SolicitudRequest r) {
+            return solicitudes.actualizar(u.id(), id, r);
+        }
+
+        @PostMapping(value = "/{id}/adjuntos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        public SolicitudDetalleDto adjuntar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestParam(defaultValue = "SOPORTE") String tipo,
+                                            @RequestParam("archivo") MultipartFile archivo) {
+            return solicitudes.adjuntar(u.id(), id, tipo, archivo);
+        }
+
+        @DeleteMapping("/{id}/adjuntos/{adjuntoId}")
+        public SolicitudDetalleDto quitarAdjunto(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @PathVariable Long adjuntoId) {
+            return solicitudes.quitarAdjunto(u.id(), id, adjuntoId);
+        }
+
+        @PostMapping("/{id}/enviar")
+        public SolicitudDetalleDto enviar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody(required = false) TextoRequest r) {
+            return solicitudes.enviar(u.id(), id, r);
+        }
+
+        @PostMapping("/{id}/devolver")
+        public SolicitudDetalleDto devolver(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody TextoRequest r) {
+            return solicitudes.devolver(u.id(), id, r);
+        }
+
+        @PostMapping("/{id}/priorizar")
+        public SolicitudDetalleDto priorizar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody PriorizarRequest r) {
+            return solicitudes.priorizar(u.id(), id, r);
+        }
+
+        @PostMapping("/{id}/decidir")
+        public SolicitudDetalleDto decidir(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody DecisionRequest r) {
+            return solicitudes.decidir(u.id(), id, r);
+        }
+
+        @PostMapping("/{id}/cerrar")
+        public SolicitudDetalleDto cerrar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody TextoRequest r) {
+            return solicitudes.cerrar(u.id(), id, r);
+        }
+
+        @PostMapping("/{id}/cancelar")
+        public SolicitudDetalleDto cancelar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody TextoRequest r) {
+            return solicitudes.cancelar(u.id(), id, r);
+        }
+
+        @PutMapping("/{id}/presupuesto")
+        public SolicitudDetalleDto presupuesto(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody PresupuestoRequest r) {
+            return solicitudes.presupuesto(u.id(), id, r);
+        }
+
+        @PutMapping("/{id}/contratacion")
+        public SolicitudDetalleDto contratacion(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody ContratacionRequest r) {
+            return solicitudes.contratacion(u.id(), id, r);
+        }
+    }
+
+    // =====================================================================================================
+    // Presupuestos y contratación (presupuesto de la sede)
+    // =====================================================================================================
+    @RestController
+    @RequestMapping("/api/presupuesto")
+    public static class PresupuestoController {
+        private final PresupuestoService presupuesto;
+        private final Acceso acceso;
+        public PresupuestoController(PresupuestoService presupuesto, Acceso acceso) { this.presupuesto = presupuesto; this.acceso = acceso; }
+
+        @GetMapping
+        public PresupuestoDto sede(@AuthenticationPrincipal AuthUser u) {
+            acceso.exigir(u.id(), Permiso.PRESUPUESTO_GESTIONAR);
+            return presupuesto.deSede(u.id());
+        }
+
+        @GetMapping("/resumen")
+        public ResumenPresupuestoDto resumen(@AuthenticationPrincipal AuthUser u) {
+            acceso.exigir(u.id(), Permiso.PRESUPUESTO_GESTIONAR);
+            return presupuesto.resumen();
+        }
+
+        @GetMapping("/categorias")
+        public List<String> categorias() { return PresupuestoService.CATEGORIAS; }
+
+        @PostMapping("/movimientos")
+        public MovimientoDto registrar(@AuthenticationPrincipal AuthUser u, @RequestBody MovimientoRequest r) {
+            acceso.exigir(u.id(), Permiso.PRESUPUESTO_GESTIONAR);
+            return presupuesto.registrar(u.id(), r);
+        }
+
+        @PostMapping("/movimientos/{id}/anular")
+        public MovimientoDto anular(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody AnularRequest r) {
+            acceso.exigir(u.id(), Permiso.PRESUPUESTO_GESTIONAR);
+            return presupuesto.anular(u.id(), id, r.motivo());
+        }
+    }
+
+    // =====================================================================================================
+    // Reportes y seguimiento
+    // =====================================================================================================
+    @RestController
+    @RequestMapping("/api/seguimiento")
+    public static class SeguimientoController {
+        private final SeguimientoService seguimiento;
+        public SeguimientoController(SeguimientoService seguimiento) { this.seguimiento = seguimiento; }
+
+        /** estado: PENDIENTE, EN_CURSO, CUMPLIDO, CANCELADO, ABIERTOS, VENCIDOS o vacío. */
+        @GetMapping("/compromisos")
+        public List<CompromisoDto> compromisos(@AuthenticationPrincipal AuthUser u, @RequestParam(required = false) String estado,
+                                               @RequestParam(required = false) Long laboratorioId) {
+            return seguimiento.compromisos(u.id(), estado, laboratorioId);
+        }
+
+        @PostMapping("/compromisos")
+        public CompromisoDto crearCompromiso(@AuthenticationPrincipal AuthUser u, @RequestBody CompromisoRequest r) {
+            return seguimiento.crearCompromiso(u.id(), r);
+        }
+
+        @PutMapping("/compromisos/{id}")
+        public CompromisoDto actualizarCompromiso(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody CompromisoRequest r) {
+            return seguimiento.actualizarCompromiso(u.id(), id, r);
+        }
+
+        @PostMapping("/compromisos/{id}/estado")
+        public CompromisoDto estadoCompromiso(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody EstadoRequest r) {
+            return seguimiento.estadoCompromiso(u.id(), id, r);
+        }
+
+        /** Posibles responsables de un compromiso (laboratorioId vacío = toda la sede). */
+        @GetMapping("/personas")
+        public List<PersonaDto> personas(@AuthenticationPrincipal AuthUser u, @RequestParam(required = false) Long laboratorioId) {
+            return seguimiento.personas(u.id(), laboratorioId);
+        }
+
+        @GetMapping("/avances")
+        public List<AvanceDto> avances(@AuthenticationPrincipal AuthUser u, @RequestParam(required = false) Long laboratorioId,
+                                       @RequestParam(required = false) Long compromisoId, @RequestParam(required = false) Long solicitudId,
+                                       @RequestParam(required = false) String verificacion) {
+            return seguimiento.avances(u.id(), laboratorioId, compromisoId, solicitudId, verificacion);
+        }
+
+        /** Avance con evidencias (multipart: laboratorioId, compromisoId, solicitudId, descripcion, porcentaje, evidencias). */
+        @PostMapping(value = "/avances", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        public AvanceDto registrarAvance(@AuthenticationPrincipal AuthUser u, @RequestParam(required = false) Long laboratorioId,
+                                         @RequestParam(required = false) Long compromisoId, @RequestParam(required = false) Long solicitudId,
+                                         @RequestParam String descripcion, @RequestParam(required = false) Integer porcentaje,
+                                         @RequestParam(value = "evidencias", required = false) List<MultipartFile> evidencias) {
+            return seguimiento.registrarAvance(u.id(), new AvanceRequest(laboratorioId, compromisoId, solicitudId, descripcion, porcentaje), evidencias);
+        }
+
+        @PostMapping("/avances/{id}/verificar")
+        public AvanceDto verificar(@AuthenticationPrincipal AuthUser u, @PathVariable Long id, @RequestBody VerificarRequest r) {
+            return seguimiento.verificar(u.id(), id, r);
+        }
+    }
+
+    @RestController
+    @RequestMapping("/api")
+    public static class ReportesController {
+        private final ReporteService reportes;
+        private final AlertaService alertas;
+        public ReportesController(ReporteService reportes, AlertaService alertas) { this.reportes = reportes; this.alertas = alertas; }
+
+        @GetMapping("/tablero")
+        public TableroDto tablero(@AuthenticationPrincipal AuthUser u) { return reportes.tablero(u.id()); }
+
+        @GetMapping("/reportes/indicadores")
+        public IndicadoresDto indicadores(@AuthenticationPrincipal AuthUser u) { return reportes.indicadores(u.id()); }
+
+        /** tipo: inventario, mantenimientos, novedades, solicitudes, compromisos, avances, indicadores o historial. */
+        @GetMapping(value = "/reportes/{tipo}.csv", produces = "text/csv;charset=UTF-8")
+        public ResponseEntity<byte[]> csv(@AuthenticationPrincipal AuthUser u, @PathVariable String tipo,
+                                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+                                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+                                          @RequestParam(required = false) String laboratorio) {
+            String limpio = tipo == null ? "reporte" : tipo.replaceAll("[^a-z]", "");
+            return Controllers.csv(reportes.csv(u.id(), tipo, desde, hasta, laboratorio), "labcontrol-" + limpio + "-" + LocalDate.now() + ".csv");
+        }
+
+        @GetMapping("/historial")
+        public List<HistorialDto> historial(@AuthenticationPrincipal AuthUser u,
+                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+                                            @RequestParam(required = false) String laboratorio, @RequestParam(required = false) String q) {
+            return reportes.historial(u.id(), desde, hasta, laboratorio, q);
+        }
+
+        @GetMapping("/alertas")
+        public List<AlertaDto> alertas(@AuthenticationPrincipal AuthUser u) { return alertas.listar(u.id()); }
+    }
+
+    /** Descarga de archivos privados (documentos, cotizaciones, fotografías de novedades y evidencias). */
+    @RestController
+    @RequestMapping("/api/archivos")
+    public static class ArchivosController {
+        private final ArchivoService archivos;
+        public ArchivosController(ArchivoService archivos) { this.archivos = archivos; }
+
+        @GetMapping("/{id}")
+        public ResponseEntity<byte[]> descargar(@AuthenticationPrincipal AuthUser u, @PathVariable String id) {
+            Archivo a = archivos.descargar(u.id(), id);
+            String nombre = URLEncoder.encode(a.getNombre(), StandardCharsets.UTF_8).replace("+", "%20");
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(a.getTipoContenido()))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + nombre)
+                    .header("X-Content-Type-Options", "nosniff")
+                    .cacheControl(CacheControl.noStore())
+                    .body(a.getDatos());
         }
     }
 }

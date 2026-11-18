@@ -14,5 +14,7 @@ public interface HistorialRepository extends Repository<HistorialEvento, Long> {
     @Query("select h from HistorialEvento h where h.fecha >= :desde and h.fecha < :hasta order by h.fecha desc")
     List<HistorialEvento> entre(@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
 
+    @Query("select h from HistorialEvento h where h.placa = :placa order by h.fecha desc")
+    List<HistorialEvento> dePlaca(@Param("placa") String placa);
     long count();
 }

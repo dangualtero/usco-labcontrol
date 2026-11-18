@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useNavigate } from 'react-router-dom'
 import { api, setToken, getSede, estaConectado, suscribirConexion, reintentarTodo } from '../api/index.js'
 import { homeDe } from '../lib/constantes.js'
+import { inicioDe } from '../lib/modulos.js'
 
 const Ctx = createContext(null)
 export const useAuth = () => useContext(Ctx)
@@ -57,16 +58,6 @@ export function AuthProvider({ children }) {
     return r.usuario
   }, [])
 
-  /** Abre la sesión con la respuesta del servidor (p. ej. al verificar el código de registro). */
-  const abrirSesion = useCallback((r) => {
-    setToken(r.token)
-    const s = { token: r.token, usuario: r.usuario }
-    guardar(s, false)
-    ultimo.current = Date.now()
-    setSesion({ ...s, recordar: false })
-    return r.usuario
-  }, [])
-
   /** Cierra la sesión y destruye el token (PS-06). */
   const cerrar = useCallback((motivo) => {
     setToken(null)
@@ -97,11 +88,11 @@ export function AuthProvider({ children }) {
 
   const valor = useMemo(() => ({
     usuario: sesion?.usuario ?? null,
-    grupo: sesion?.usuario?.grupo ?? null,
-    // Inicio del rol en su sede (el Coordinador general, en la sede que esté viendo).
-    home: sesion ? homeDe(sesion.usuario.grupo, sesion.usuario.sede ?? getSede()) : '/',
-    validando, conectado, restante, iniciar, abrirSesion, cerrar, continuar, reintentar: () => { reintentarTodo(); validar() },
-  }), [sesion, validando, conectado, restante, iniciar, abrirSesion, cerrar, continuar, validar])
+    rol: sesion?.usuario?.rol ?? null,
+    // Inicio de la cuenta en su sede (el Administrador general, en la sede que esté viendo).
+    home: sesion ? homeDe(sesion.usuario.sede ?? getSede(), inicioDe(sesion.usuario)) : '/',
+    validando, conectado, restante, iniciar, cerrar, continuar, reintentar: () => { reintentarTodo(); validar() },
+  }), [sesion, validando, conectado, restante, iniciar, cerrar, continuar, validar])
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>
 }

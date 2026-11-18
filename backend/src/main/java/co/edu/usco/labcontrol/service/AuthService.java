@@ -1,5 +1,6 @@
 package co.edu.usco.labcontrol.service;
 
+import co.edu.usco.labcontrol.domain.Rol;
 import co.edu.usco.labcontrol.domain.Usuario;
 import co.edu.usco.labcontrol.repo.UsuarioRepository;
 import co.edu.usco.labcontrol.security.JwtService;
@@ -31,13 +32,15 @@ public class AuthService {
     private final JwtService jwt;
     private final Mapper mapper;
     private final Clock clock;
+    private final PermisoService permisos;
     private final Map<String, Intentos> fallos = new ConcurrentHashMap<>();
 
-    public AuthService(UsuarioRepository usuarios, PasswordEncoder encoder, JwtService jwt, Mapper mapper, Clock clock) {
-        this.usuarios = usuarios; this.encoder = encoder; this.jwt = jwt; this.mapper = mapper; this.clock = clock;
+    public AuthService(UsuarioRepository usuarios, PasswordEncoder encoder, JwtService jwt, Mapper mapper, Clock clock, PermisoService permisos) {
+        this.usuarios = usuarios; this.encoder = encoder; this.jwt = jwt; this.mapper = mapper; this.clock = clock; this.permisos = permisos;
     }
 
     /** El rol NO lo elige el usuario: se obtiene de la cuenta almacenada en MySQL. */
+    @Transactional
     public LoginResponse login(LoginRequest r) {
         String correo = r.email() == null ? "" : r.email().trim().toLowerCase();
         if (correo.isEmpty()) throw ApiException.badRequest("El correo institucional es obligatorio");
@@ -59,7 +62,10 @@ public class AuthService {
         fallos.remove(correo);
         verificarSede(u, r.sede());
         boolean recordar = Boolean.TRUE.equals(r.recordar());
-        return new LoginResponse(jwt.generar(u, recordar), mapper.usuario(u), jwt.expiraEnSegundos(recordar));
+        if (u.getRol() != Rol.ADMINISTRADOR && u.getLaboratorios().stream().noneMatch(l -> l.isActivo())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Tu cuenta aún no tiene laboratorios asignados. Pídele al Administrador que te asigne uno.");
+        }
+        return new LoginResponse(jwt.generar(u, recordar), mapper.usuario(u, permisos.de(u)), jwt.expiraEnSegundos(recordar));
     }
 
     /**
@@ -80,14 +86,14 @@ public class AuthService {
     }
 
     /**
-     * Cada sede tiene su propia URL (/neiva/login, /pitalito/login…). Estudiantes, docentes y auxiliares solo ingresan por
-     * la de su sede; el Coordinador general ingresa por cualquiera. Se valida DESPUÉS de comprobar la contraseña, para
+     * Cada sede tiene su propia URL (/neiva/login, /pitalito/login…). Coordinadores y monitores solo ingresan por la de su
+     * sede; el Administrador general ingresa por cualquiera. Se valida DESPUÉS de comprobar la contraseña, para
      * no revelar a terceros a qué sede pertenece una cuenta.
      */
     private static void verificarSede(Usuario u, String slugUrl) {
         if (u.getSede() == null) return;
         if (!u.getSede().isActiva()) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "La " + u.getSede().getNombre() + " está inactiva. Comunícate con la Coordinación de Laboratorios.");
+            throw new ApiException(HttpStatus.FORBIDDEN, "La " + u.getSede().getNombre() + " está inactiva. Comunícate con el Administrador de LabControl.");
         }
         if (slugUrl != null && !slugUrl.isBlank() && !u.getSede().getSlug().equalsIgnoreCase(slugUrl.trim())) {
             throw new ApiException(HttpStatus.FORBIDDEN, "Tu cuenta pertenece a la " + u.getSede().getNombre()
@@ -97,7 +103,8 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public UsuarioDto yo(Long id) {
-        return mapper.usuario(usuarios.findById(id).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Sesión no válida o expirada")));
+        Usuario u = usuarios.findById(id).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Sesión no válida o expirada"));
+        return mapper.usuario(u, permisos.de(u));
     }
 
     @Transactional

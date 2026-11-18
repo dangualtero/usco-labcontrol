@@ -14,7 +14,9 @@ public interface ReporteNovedadRepository extends JpaRepository<ReporteNovedad, 
     List<ReporteNovedad> findBySedeIdAndNotificacionOrderByCreadoEnAsc(Long sedeId, ReporteNovedad.Notificacion notificacion);
     List<ReporteNovedad> findBySedeIdAndPrioridadAndEstadoInOrderByCreadoEnDesc(Long sedeId, String prioridad, Collection<ReporteNovedad.Estado> estados);
     /** Huella barata de los reportes de una sede: cambia cuando llega uno nuevo, se notifica o se actualiza su seguimiento. */
-    @Query("select count(r), max(r.id), max(r.actualizadoEn), max(r.notificadoEn), sum(r.intentosNotificacion) from ReporteNovedad r where r.sede.id = :sede")
+    @Query("select count(r), max(r.id), max(r.actualizadoEn), max(r.notificadoEn), sum(r.intentosNotificacion), max(r.validadoEn) from ReporteNovedad r where r.sede.id = :sede")
     List<Object[]> huella(@Param("sede") Long sedeId);
+    List<ReporteNovedad> findByEquipoIdOrderByCreadoEnDesc(Long equipoId);
+    long countBySedeIdAndValidacion(Long sedeId, ReporteNovedad.Validacion validacion);
     boolean existsByEquipoIdAndTipoAndReportadoPorAndCreadoEnAfter(Long equipoId, ReporteNovedad.Tipo tipo, String reportadoPor, LocalDateTime desde);
 }

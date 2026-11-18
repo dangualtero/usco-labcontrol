@@ -1,6 +1,8 @@
 package co.edu.usco.labcontrol.domain;
 
 import jakarta.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "usuarios")
@@ -19,27 +21,31 @@ public class Usuario {
 
     private String documento;
 
-    /** Código estudiantil (solo estudiantes); permite buscar en ventanilla por código o por documento. */
-    private String codigoEstudiantil;
-
+    /** Cargo, programa o dependencia. */
     private String programa;
+
+    private String telefono;
 
     private boolean activo = true;
 
-    /** Sede a la que pertenece. Estudiantes, docentes y auxiliares tienen una; el Coordinador (general) no tiene: administra todas. */
+    /** Sede a la que pertenece. Coordinadores y monitores tienen una; el Administrador (general) no tiene: administra todas. */
     @ManyToOne
     private Sede sede;
 
+    /** Laboratorios asignados (Coordinador de Laboratorio y Monitor): uno o varios. */
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(name = "usuario_laboratorios", joinColumns = @JoinColumn(name = "usuario_id"),
+               inverseJoinColumns = @JoinColumn(name = "laboratorio_id"))
+    private Set<Laboratorio> laboratorios = new HashSet<>();
+
     protected Usuario() {}
 
-    public Usuario(String nombre, String correo, String passwordHash, Rol rol, String documento,
-                   String codigoEstudiantil, String programa) {
+    public Usuario(String nombre, String correo, String passwordHash, Rol rol, String documento, String programa) {
         this.nombre = nombre;
         this.correo = correo;
         this.passwordHash = passwordHash;
         this.rol = rol;
         this.documento = documento;
-        this.codigoEstudiantil = codigoEstudiantil;
         this.programa = programa;
     }
 
@@ -52,7 +58,11 @@ public class Usuario {
     public Rol getRol() { return rol; }
     public void setRol(Rol rol) { this.rol = rol; }
     public String getDocumento() { return documento; }
-    public String getCodigoEstudiantil() { return codigoEstudiantil; }
+    public String getTelefono() { return telefono; }
+    public void setTelefono(String telefono) { this.telefono = telefono; }
+    public void setDocumento(String documento) { this.documento = documento; }
+    public Set<Laboratorio> getLaboratorios() { return laboratorios; }
+    public boolean esAdministrador() { return rol == Rol.ADMINISTRADOR; }
     public String getPrograma() { return programa; }
     public void setPrograma(String programa) { this.programa = programa; }
     public boolean isActivo() { return activo; }

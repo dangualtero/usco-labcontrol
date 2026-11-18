@@ -32,7 +32,10 @@ public class HistorialInmutabilidad implements ApplicationRunner {
                     "SELECT trigger_name FROM information_schema.triggers WHERE trigger_schema = DATABASE() AND event_object_table = 'historial_eventos'",
                     String.class);
             if (triggers.size() >= 2) log.info("Historial inmutable: triggers de solo-inserción activos en MySQL");
-            else log.warn("Faltan los triggers del historial inmutable. Ejecuta backend/db/02_inmutabilidad.sql como root.");
+            // Con mínimo privilegio (solo SELECT/INSERT/UPDATE/DELETE) MySQL no le muestra los triggers al usuario de la
+            // aplicación, aunque existan. Por eso no es un error: solo se indica cómo comprobarlo con root.
+            else log.info("Historial inmutable: los triggers se crean con backend/db/02_inmutabilidad.sql. El usuario de la "
+                    + "aplicación no tiene permiso para listarlos; compruébalo como root con: SHOW TRIGGERS FROM labcontrol;");
         } catch (Exception e) {
             log.warn("No se pudo verificar el historial inmutable: {}", e.getMessage());
         }

@@ -1,7 +1,9 @@
 # USCO LabControl
 
-Sistema web para la **gestión y trazabilidad de préstamos de equipos** en los laboratorios de la Facultad de Ingeniería
-de la Universidad Surcolombiana (Electrónica, Petróleos, Civil y Agrícola).
+Sistema web para la **gestión de los laboratorios** de la Facultad de Ingeniería de la Universidad Surcolombiana:
+caracterización, inventarios y mantenimientos, solicitudes y requerimientos, presupuesto y contratación, reportes y
+seguimiento. Cada sede tiene sus propios laboratorios. **3 roles:** Administrador general, Coordinador de Laboratorio y
+Monitor de Laboratorio (detalle en [docs/ROLES_Y_PERMISOS.md](docs/ROLES_Y_PERMISOS.md)).
 Proyecto Integrador II · Daniel Felipe Gualtero · Carlos David Neira Vega · Cesar Sneider Pimiento Torres.
 
 | Capa | Tecnología |
@@ -13,28 +15,20 @@ Proyecto Integrador II · Daniel Felipe Gualtero · Carlos David Neira Vega · C
 La aplicación depende al 100 % del backend y de MySQL. Si la API no responde, el frontend muestra
 **«Error de conexión con el servidor USCO LabControl - Verifique que la API Spring Boot esté activa»** (con botón *Reintentar*) y nunca datos inventados.
 
-## Credenciales de acceso (cuentas creadas en MySQL, contraseñas cifradas con BCrypt)
+## Primer acceso (no hay usuarios quemados en el código)
 
-El **rol se identifica automáticamente** a partir del correo: el login solo pide correo y contraseña.
-Cada persona puede cambiar su contraseña en **Mi cuenta**, y el Coordinador puede crear usuarios y restablecer contraseñas en **Usuarios**.
+La base de datos arranca **sin cuentas**. Para el primer ingreso, define estas variables antes de iniciar el backend
+(en IntelliJ: *Run → Edit Configurations → Environment variables*; en el servidor: el archivo `.env`):
 
-| Persona | Rol (panel al que entra) | Correo | Contraseña |
-|---|---|---|---|
-| Administrador LabControl | COORDINADOR (general) | `admin@usco.edu.co` | `Admin#USCO2026` |
-| Daniel Felipe Gualtero | COORDINADOR · Dashboard, historial, inventario y usuarios | `daniel.gualtero@usco.edu.co` | `Daniel#USCO2026` |
-| Carlos David Neira Vega | AUXILIAR · Ventanilla, inventario y cierre de turno | `carlos.neira@usco.edu.co` | `Carlos#USCO2026` |
-| Cesar Sneider Pimiento Torres | ESTUDIANTE · Catálogo, mis reservas, mi historial | `cesar.pimiento@usco.edu.co` | `Cesar#USCO2026` |
-| Sandra Milena Vargas | COORDINADOR | `coordinador@usco.edu.co` | `Coord#USCO2026` |
-| Juan Pablo Trujillo | AUXILIAR | `auxiliar@usco.edu.co` | `Aux#USCO2026` |
-| Marcela Ortiz | AUXILIAR | `auxiliar2@usco.edu.co` | `Aux2#USCO2026` |
-| Mauricio Perdomo | DOCENTE | `docente@usco.edu.co` | `Doc#USCO2026` |
-| Laura Gómez (cód. 20211100456 · doc. 1075123456) | ESTUDIANTE | `estudiante@usco.edu.co` | `Est#USCO2026` |
-| Andrés Ramírez (cód. 20201100011) | ESTUDIANTE | `andres.ramirez@usco.edu.co` | `Andres#USCO2026` |
-| Valentina Cuéllar (cód. 20211100012) | ESTUDIANTE | `valentina.cuellar@usco.edu.co` | `Valentina#USCO2026` |
-| Camila Rojas (cód. 20221100013) | ESTUDIANTE | `camila.rojas@usco.edu.co` | `Camila#USCO2026` |
-| Sebastián Medina (cód. 20211100014) | ESTUDIANTE | `sebastian.medina@usco.edu.co` | `Sebastian#USCO2026` |
+```
+LABCONTROL_ADMIN_CORREO=tu.correo@usco.edu.co
+LABCONTROL_ADMIN_CLAVE=una-contraseña-segura
+```
 
-> Estas son las **contraseñas iniciales** de `backend/db/03_datos_iniciales.sql` (guardadas con BCrypt). **Cámbialas antes de publicar el sistema fuera de la red de pruebas.**
+Al arrancar, si no existe ningún Administrador general activo, el backend lo crea (contraseña cifrada con BCrypt).
+Después de entrar puedes quitar `LABCONTROL_ADMIN_CLAVE`: las demás cuentas (coordinadores y monitores, con sus
+laboratorios) se crean en **Administración → Usuarios y roles**, y cada persona cambia su contraseña en **Mi cuenta**.
+El rol se identifica a partir del correo: el login solo pide correo y contraseña.
 
 ## Cómo ejecutarlo
 
@@ -44,9 +38,6 @@ Requisitos: Java 21 + Maven, Node 20+ y MySQL 8.
 No hay que hacer nada más: si MySQL no está encendido, la API lo inicia sola (`MysqlLocalAutostart` ejecuta `iniciar-mysql.ps1`;
 MySQL queda corriendo aunque detengas la API). Se desactiva con `labcontrol.mysql.autostart=false`, y solo actúa en Windows con una base local.
 
-```powershell
-.\iniciar.ps1        # alternativa por consola: MySQL portátil -> API (8080) -> frontend (5173) y abre el navegador
-```
 
 Paso a paso:
 
@@ -71,8 +62,7 @@ Variables de entorno de la API (los valores por defecto sirven para el desarroll
 | `MYSQL_USER` / `MYSQL_PASSWORD` | `labcontrol` / `LabControl#2026` (solo desarrollo) | Credenciales de la base |
 | `LABCONTROL_JWT_SECRET` | secreto de desarrollo | Firma de tokens (mínimo 32 caracteres) |
 | `LABCONTROL_JWT_MINUTOS` / `LABCONTROL_JWT_DIAS_RECORDAR` | `60` / `7` | Vigencia del token (normal / «Recordar mi sesión») |
-| `LABCONTROL_SEED` | `true` | Carga inicial de usuarios e inventario si la base está vacía |
-| `LABCONTROL_SEED_HISTORIAL` | `true` | Incluye préstamos, reservas e historial de ejemplo; en `false` arranca con inventario y usuarios solamente |
+| `LABCONTROL_ADMIN_CORREO` / `LABCONTROL_ADMIN_CLAVE` | vacío | Crea el primer Administrador general si la base no tiene ninguno (opcional: `LABCONTROL_ADMIN_NOMBRE`, `LABCONTROL_ADMIN_DOCUMENTO`) |
 
 ### Base de datos: definida 100 % en SQL
 
@@ -81,69 +71,68 @@ La estructura completa vive en `backend/db/` y el backend **no crea ni modifica 
 | Script | Qué hace |
 |---|---|
 | `00_usuario_mysql.sql` | Base `labcontrol` y usuario de la aplicación, con permisos solo de datos (SELECT, INSERT, UPDATE, DELETE) |
-| `01_esquema.sql` | 12 tablas con sus llaves, índices y restricciones (**borra y recrea** las tablas) |
+| `01_esquema.sql` | 25 tablas con sus llaves, índices y restricciones (**borra y recrea** las tablas) |
 | `02_inmutabilidad.sql` | Triggers que impiden UPDATE y DELETE en `historial_eventos` |
-| `03_datos_iniciales.sql` | Sede Neiva, sus 4 laboratorios, 13 cuentas (contraseñas BCrypt), 19 equipos y 5 insumos de ejemplo |
-| `04_claves_en_texto_normal.sql` | Solo para bases creadas antes: permite escribir contraseñas normales en los INSERT |
-| `05_insumos_laboratorios_reportes.sql` | Solo para bases creadas antes de la v1.4: agrega insumos y cantidades, laboratorios por sede, seguimiento de reportes y solicitudes de insumos. No borra nada y se puede ejecutar varias veces (`.\actualizar-base-datos.ps1`) |
+| `03_datos_iniciales.sql` | Sede Neiva, sus 4 laboratorios, 19 equipos y 5 insumos de ejemplo. **No crea usuarios** (ver «Primer acceso») |
+| `05_insumos_laboratorios_reportes.sql` | Solo para bases creadas antes de la v1.4. No borra nada y se puede ejecutar varias veces |
+| `06_roles_y_modulos.sql` | Solo para bases creadas antes de la v2.0: convierte los roles (Coordinador → Administrador, Docente → Coordinador de Laboratorio, Auxiliar → Monitor) y crea las tablas de los módulos nuevos. No borra datos y se puede ejecutar varias veces (`.\actualizar-base-datos.ps1`) |
 
 **Crear usuarios con un INSERT:** escribe la contraseña normal en `password_hash` (por ejemplo `'Usco#2026'`). El backend la cifra con BCrypt a los pocos segundos (`CifradoContrasenas`), o en el primer inicio de sesión si la persona entra antes. Mientras tanto, la contraseña se ve en texto normal en la base, así que usa una contraseña inicial y pide que la cambien en **Mi cuenta**.
 
 Para ejecutarlos: `.\crear-base-datos.ps1` (MySQL portátil), o abre cada archivo en IntelliJ (**Database**) y ejecútalo en orden con root. En Docker se ejecutan solos la primera vez.
 
-## Funcionalidades por rol (todas contra MySQL)
+## Roles y módulos (v2.0)
 
-- **Estudiante / Docente:** catálogo con fotografías y filtros instantáneos, **ficha técnica completa** (foto, marca, modelo, serie, ubicación exacta, estado físico, accesorios, disponibilidad), solicitud de préstamo (fecha, franja, asignatura, docente), **Mis reservas** (cancelar pendientes, ver rechazos), **Mi historial**, alertas de devolución vencida y **Mi cuenta** (cambio de contraseña).
-- **Auxiliar:** ventanilla con búsqueda por código estudiantil o documento, **aprobar y registrar salida** (azul) o **rechazar** con motivo, **registrar entrada** (verde) con checklist de estado físico y advertencia disciplinaria, alertas de retraso, **inventario** (enviar a mantenimiento / reactivar) y **cierre de turno** con transferencia de custodia.
-- **Coordinador general:** sedes, presupuesto por sede, dashboard con KPIs y gráficos, **historial inmutable** con filtros y exportación CSV sanitizada, **CRUD de equipos** (crear, editar, mantenimiento, baja lógica) y **gestión de usuarios** (crear con rol, activar/desactivar, restablecer contraseña).
-- **Seguridad:** login único por correo `@usco.edu.co` y contraseña, JWT, BCrypt, autorización por rol en el servidor (`SecurityConfig`) y en el cliente (`RequiereRol`), bloqueo temporal tras 5 intentos fallidos, mensajes de error genéricos, el rol y el estado de la cuenta se verifican en la base de datos en **cada** petición, cierre de sesión por inactividad (sin «Recordar mi sesión»).
-- **Concurrencia:** bloqueo pesimista sobre el equipo (`SELECT … FOR UPDATE`): cero préstamos duplicados.
+| Módulo | Administrador general | Coordinador de Laboratorio | Monitor de Laboratorio |
+|---|---|---|---|
+| Tablero de control y parametrización | Exclusivo: laboratorios, usuarios, roles y permisos, catálogos, alertas, plantillas | Indicadores de sus laboratorios | Indicadores de sus laboratorios |
+| Laboratorios: caracterización y documentación | Todos | Actualiza datos, documentos y evidencias | Consulta |
+| Inventarios y mantenimientos | Todo | Bienes, hoja de vida, valida novedades, mantenimientos | Consulta, información operativa, **registro preliminar** de novedades con fotos |
+| Solicitudes y requerimientos | Revisa, devuelve, prioriza, decide y cierra | Crea, adjunta, **valida** lo del monitor y envía | Prepara borradores (su «envío» va al coordinador) |
+| Presupuestos y contratación | Registra presupuesto y contratación | Consulta el estado de sus solicitudes | — |
+| Reportes y seguimiento | Reportes institucionales, verifica avances y compromisos | Reportes, compromisos, avances y evidencias | Reportes, avances y evidencias |
 
-## Insumos, reportes en tiempo real, alertas y laboratorios (v1.4)
+- **Asignación:** cada coordinador o monitor tiene uno o varios laboratorios y solo ve esos. El Administrador ve todo y cambia de sede con el selector.
+- **Permisos configurables:** el Administrador ajusta la matriz en **Parametrización → Permisos por rol** (lo exclusivo del Administrador no se delega).
+- **Novedades:** el monitor reporta (con fotografías y soportes) → el coordinador valida → se aplica al inventario y se avisa por correo con el agente de IA de n8n. Incluye conteos de existencias y consumos de insumos con conversión de unidades.
+- **Solicitudes:** borrador → en revisión del coordinador → enviada → aprobada o rechazada → cerrada (con devolución para ajuste), cotizaciones adjuntas, prioridad propuesta y asignada, presupuesto (rubro, fuente, CDP) y contratación, que puede registrar el gasto en el presupuesto de la sede.
+- **Alertas:** existencias bajas, equipos fuera de servicio, novedades por validar, mantenimientos vencidos o próximos, solicitudes por validar, devueltas o sin decisión y compromisos vencidos (umbrales configurables).
+- **Reportes:** indicadores por laboratorio y exportación CSV de inventario, mantenimientos, novedades, solicitudes, compromisos, avances, indicadores e historial.
+- **Seguridad:** login por correo `@usco.edu.co` y contraseña, JWT, BCrypt, permisos verificados en el servidor en **cada** acción, archivos privados que solo descarga quien ve el laboratorio, bloqueo temporal tras 5 intentos fallidos y cierre de sesión por inactividad.
+- **Correo:** las novedades de prioridad ALTA se envían al instante; MEDIA y BAJA van en un **resumen diario** (7:00 a. m., `LABCONTROL_RESUMEN_CRON`). Las notificaciones del flujo (novedad por validar, solicitud enviada, devuelta, decidida, cerrada, mantenimiento programado, compromiso asignado) usan plantillas editables.
 
-- **Inventario con dos categorías:** **equipos** (se prestan, placa `USCO-EQ-000`) e **insumos** (se consumen, placa `USCO-IN-000`). Filtro Todos · Equipos · Insumos en el inventario del coordinador, del auxiliar y en el catálogo.
-- **Cantidades con unidad de medida:** implementos por unidades (1, 2, 3…), líquidos en **mL o L**, sólidos en **mg, g o kg** y longitudes en **cm o m**. Cada insumo tiene una *cantidad de referencia* (100 %).
-- **Solicitudes de insumos:** el estudiante o docente pide una cantidad (puede pedir 250 mL de un insumo que se guarda en litros) y el **auxiliar la aprueba** —se descuenta de las existencias y queda en el historial como `CONSUMO`— **o la rechaza** con motivo. Auxiliar → **Insumos**; estudiante → **Mis reservas**.
-- **Alertas** (coordinador y auxiliar): insumo **agotado** o con **25 % o menos** de su referencia, reportes ALTA/MEDIA sin resolver, préstamos vencidos, equipos en mantenimiento y solicitudes pendientes. Filtros por tipo de alerta y por elemento (equipos/insumos, laboratorio, búsqueda).
-- **Reportes:** todos los reportes de la sede **en tiempo real** (se revisa cada 5 s y avisa cuando llega uno nuevo), filtros por estado, prioridad, tipo y aviso, y **seguimiento** Abierto → En proceso → Resuelto con comentarios.
-- **Correo:** solo la prioridad **ALTA** se envía al instante. MEDIA y BAJA se acumulan y salen en un **resumen diario** (7:00 a. m., `LABCONTROL_RESUMEN_CRON`) junto con los insumos en alerta. Botón «Enviar resumen diario ahora» en Reportes.
-- **Laboratorios por sede:** Coordinador → **Laboratorios** (crear, editar, desactivar). Los equipos e insumos se asignan a un laboratorio de su sede.
-- **Dashboard:** presupuesto disponible (sede y total), laboratorios de la sede, sedes existentes, insumos en alerta y reportes sin resolver.
+Todo el detalle, la matriz de permisos y las **mejoras hechas a los requisitos de la hoja** están en [docs/ROLES_Y_PERMISOS.md](docs/ROLES_Y_PERMISOS.md).
 
-## Registro con código, avisos con IA y despliegue (v1.3)
-
-- **Registro de estudiantes** (`/neiva/registro`, enlace en el ingreso): el estudiante llena sus datos y recibe un **código de 6 dígitos** en su correo @usco.edu.co. Solo al ingresar el código se crea su cuenta en MySQL y se abre la sesión. El código vence en 15 minutos, admite 5 intentos y se puede reenviar cada 60 segundos. Sin correo configurado, el código aparece en la consola del backend (`CORREO NO ENVIADO`).
-- **Novedades de equipos:** el auxiliar usa **Inventario → Reportar novedad** (agotado, dañado, perdido, falla…) y puede enviar el equipo a mantenimiento en el mismo paso. Un **agente de IA en n8n** prioriza el reporte (ALTA/MEDIA/BAJA), redacta el correo y lo envía a `LABCONTROL_ALERTAS_DESTINO` (por defecto `u20232215593@usco.edu.co`). Si n8n no responde, el backend envía el aviso con una plantilla. El coordinador ve las novedades, la prioridad y la acción sugerida en **Inventario**. Configuración: [n8n/README.md](n8n/README.md).
-- **Publicar en la web:** `docker-compose.prod.yml` levanta MySQL, la API, el frontend (nginx) y n8n. Paso a paso: [DESPLIEGUE.md](DESPLIEGUE.md).
-
-| Variable nueva | Para qué |
+| Variable | Para qué |
 |---|---|
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | Envío de correos (Gmail: `smtp.gmail.com`, `587`, contraseña de aplicación) |
-| `LABCONTROL_ALERTAS_DESTINO` | Correo que recibe los avisos de novedades |
-| `N8N_WEBHOOK_URL`, `N8N_WEBHOOK_TOKEN` | Flujo de n8n y token compartido (credencial Header Auth `X-LabControl-Token`) |
+| `LABCONTROL_ALERTAS_DESTINO` | Correo que recibe los avisos de novedades validadas |
+| `N8N_WEBHOOK_URL`, `N8N_WEBHOOK_TOKEN` | Flujo de n8n y token compartido (credencial Header Auth `X-LabControl-Token`). Configuración: [n8n/README.md](n8n/README.md) |
 | `LABCONTROL_APP_URL` | Dirección pública del frontend (para los enlaces de los correos) |
 | `LABCONTROL_RESUMEN_CRON`, `LABCONTROL_RESUMEN_ZONA` | Hora del resumen diario (por defecto `0 0 7 * * *`, `America/Bogota`) |
 
-## Sedes, presupuesto y fotografías (v1.2)
+Publicar en la web: `docker-compose.prod.yml` levanta MySQL, la API, el frontend (nginx) y n8n. Paso a paso: [DESPLIEGUE.md](DESPLIEGUE.md).
+
+## Sedes, presupuesto y fotografías
 
 ### Una dirección por sede
 | Dirección | Qué muestra |
 |---|---|
 | `http://localhost:5173/` | «Elige tu sede» (solo sedes activas) |
 | `http://localhost:5173/neiva/login` | Ingreso a la Sede Neiva |
-| `http://localhost:5173/pitalito/login` | Ingreso a la Sede Pitalito (cuando el coordinador la cree) |
-| `http://localhost:5173/garzon/coordinador/presupuesto` | Presupuesto de la Sede Garzón |
+| `http://localhost:5173/pitalito/login` | Ingreso a la Sede Pitalito (cuando el Administrador la cree) |
+| `http://localhost:5173/garzon/presupuesto` | Presupuesto de la Sede Garzón |
 
-- Cada estudiante, docente y auxiliar **pertenece a una sede**: solo ve el inventario, los préstamos y el historial de esa sede. Si intenta ingresar por la dirección de otra, el sistema le dice a qué sede pertenece.
-- El **Coordinador general** (rol COORDINADOR) administra todas las sedes y cambia entre ellas con el selector del encabezado; las pantallas conservan la sección (Inventario, Usuarios, Presupuesto…).
-- El frontend envía la sede en la cabecera `X-Sede`; el servidor solo la respeta para el coordinador. A los demás siempre les aplica su propia sede.
-- **Sede principal:** `03_datos_iniciales.sql` crea la *Sede Neiva* y le asigna los equipos y usuarios de ejemplo.
+- Cada coordinador y monitor **pertenece a una sede** y a sus laboratorios asignados. Si intenta ingresar por la dirección de otra sede, el sistema le dice a cuál pertenece.
+- El **Administrador general** administra todas las sedes y cambia entre ellas con el selector del encabezado; las pantallas conservan la sección (Inventario, Usuarios, Presupuesto…).
+- El frontend envía la sede en la cabecera `X-Sede`; el servidor solo la respeta para el Administrador. A los demás siempre les aplica su propia sede.
+- **Sede principal:** `03_datos_iniciales.sql` crea la *Sede Neiva* con sus laboratorios y el inventario de ejemplo.
 
-### Coordinador → Sedes
-Crear sede (ciudad → dirección web, p. ej. «La Plata» → `/la-plata`), editar nombre y dirección física, activar/desactivar (desactivar no borra datos; impide el ingreso de sus usuarios). Los usuarios nuevos se crean en la sede que está abierta.
+### Administración → Sedes
+Crear sede (ciudad → dirección web, p. ej. «La Plata» → `/la-plata`), editar nombre y dirección física, activar/desactivar (desactivar no borra datos; impide el ingreso de sus usuarios). Los coordinadores y monitores nuevos se crean en la sede que está abierta.
 
-### Coordinador → Presupuesto
-Un presupuesto por sede. **Ingreso** suma y **Gasto** resta; no se permite un gasto mayor al saldo. Cada movimiento lleva concepto, categoría, valor en COP, fecha (no futura) y placa opcional del equipo. Los movimientos **no se borran**: se anulan con motivo y quedan visibles tachados. Incluye gastos por categoría y el saldo de todas las sedes.
+### Presupuestos y contratación → Presupuesto
+Un presupuesto por sede. **Ingreso** suma y **Gasto** resta; no se permite un gasto mayor al saldo. Cada movimiento lleva concepto, categoría, valor en COP, fecha (no futura) y placa opcional del equipo. Los movimientos **no se borran**: se anulan con motivo y quedan visibles tachados. Incluye gastos por categoría y el saldo de todas las sedes. Los gastos de una solicitud contratada quedan enlazados a ella.
 
 ### Fotografía desde el computador o el celular
 En **Inventario → Nuevo / Editar equipo**, «Subir fotografía» abre el explorador de archivos (en el celular: galería o cámara). También se puede arrastrar la imagen. Antes de subirla el navegador la reduce a 1600 px en JPEG, así una foto de celular pesa unos cientos de KB.
@@ -154,27 +143,23 @@ El servidor acepta JPG, PNG o WEBP de hasta 5 MB, verifica el tipo real del arch
 Están en `frontend/public/images/equipos/usco-eq-XXX.jpg` y provienen de Wikimedia Commons (licencias libres, ver `CREDITOS.md` en esa carpeta).
 Son fotografías de equipos **de la misma marca o tipo**, no necesariamente de la unidad física del inventario USCO. `USCO-EQ-402` (Tensiómetro de humedad de suelo) usa una fotografía de un equipo Irrometer; `USCO-EQ-201` (Balanza de lodos presurizada) usa una
 **ilustración referencial** propia (`ilustraciones/usco-eq-201.svg`), porque no existe una fotografía libre del equipo. Para usar la foto real de cualquier unidad basta
-copiarla como `usco-eq-XXX.jpg` en esa carpeta, o cambiar la URL desde **Coordinador → Inventario → Editar**. Si un equipo no tiene imagen, la interfaz muestra «Fotografía no disponible».
+copiarla como `usco-eq-XXX.jpg` en esa carpeta, o cambiar la URL desde **Inventario → Editar**. Si un equipo no tiene imagen, la interfaz muestra «Fotografía no disponible».
 Los números de serie y ubicaciones de la carga inicial son datos de referencia: reemplázalos por los del inventario físico desde la misma pantalla.
 
-## Trazabilidad con los documentos del proyecto
+## Dónde está cada cosa
 
-| Requisito (QA) | Dónde está |
+| Requisito | Dónde está |
 |---|---|
-| RF-01 Autenticación y roles · PF-01..03 · PV-01/02 · PS-04/06/08/09 | `pages/Login.jsx`, `context/AuthContext.jsx`, `security/*`, `AuthService` |
-| RF-02 Catálogo y filtros · PF-04/05 · PV-07 · PU-01/02/15 | `pages/usuario/Catalogo.jsx`, `FichaEquipo.jsx` |
-| RF-03 Solicitud de préstamo · PF-06 · PV-03/05 · PU-04 | `SolicitudModal.jsx`, `PrestamoService.reservar` |
-| RF-04 Ventanilla / salida · PF-07/08 · PV-04 · PU-06/07 | `pages/auxiliar/Ventanilla.jsx`, `SalidaModal.jsx`, `PrestamoService.salida` |
-| RF-05 Devolución / novedad · PF-09/10 · PV-06/10 · PS-07 | `EntradaModal.jsx`, `PrestamoService.entrada` |
-| RF-06 Historial de usuario · PF-11 | `pages/usuario/MiHistorial.jsx` |
-| RF-07 Cierre de turno y baja · PF-12 · PV-08/09 · PS-08 | `CierreTurno.jsx`, `Inventario.jsx`, `CoordinadorService.baja` |
-| RF-08 Reportes · PF-14 · PS-10 · PA-10 | `pages/coordinador/Dashboard.jsx`, `HistorialInmutable.jsx`, `reporteCsv` |
-| Navegación global PF-13 (logo → panel del rol) | `components/Shell.jsx` (`LogoUsco`) |
-| PA-07 color funcional (azul = salida, verde = entrada) | `tailwind.config.js`, `components/ui.jsx` |
-| PS-02/PS-03 acceso restringido por rol | `RequiereRol` en `App.jsx` + `SecurityConfig` |
-| RNF-02 Confiabilidad (0 préstamos duplicados) | `EquipoRepository.findActivoForUpdate` + prueba de concurrencia |
-
-Notas de alineación con el QA: `USCO-EQ-102` es el Osciloscopio Digital; el Multímetro Fluke 179 es `USCO-EQ-103` (el informe QA usa `-102` para ambos).
+| Roles y permisos (3 roles, matriz configurable) | `domain/Rol.java`, `domain/Permiso.java`, `service/PermisoService.java`, `service/Acceso.java`, `lib/modulos.js`, `App.jsx` (`RequierePermiso`) |
+| Tablero y parametrización | `ReporteService.tablero`, `ConfiguracionService`, `pages/tablero/*`, `pages/admin/*` |
+| Laboratorios: caracterización y documentación | `LaboratorioService`, `pages/laboratorios/*` |
+| Inventarios, hojas de vida y mantenimientos | `InventarioService`, `MantenimientoService`, `pages/inventario/*` |
+| Novedades (registro preliminar y validación) | `NovedadService`, `NotificadorNovedades`, `pages/inventario/Novedades.jsx`, `components/Novedades.jsx` |
+| Solicitudes y requerimientos | `SolicitudService`, `pages/solicitudes/*` |
+| Presupuestos y contratación | `PresupuestoService`, `SolicitudService.presupuesto/contratacion`, `pages/presupuesto/*` |
+| Reportes y seguimiento | `ReporteService`, `SeguimientoService`, `pages/seguimiento/*` |
+| Historial inmutable (RF-03) | `HistorialRepository` (solo inserción) + triggers de `02_inmutabilidad.sql` |
+| Navegación PF-13 (logo → inicio) | `components/Shell.jsx` (`LogoUsco`) |
 
 ## Accesibilidad y modo oscuro
 
@@ -185,16 +170,17 @@ la primera vez sigue la preferencia del sistema y luego recuerda la elección de
 ## Pruebas
 
 ```bash
-cd backend  && mvn test     # 13 pruebas de integración (H2 en modo MySQL; incluye concurrencia con 6 hilos)
-cd frontend && npm test     # 7 pruebas de utilidades y validaciones
+cd backend  && mvn test     # pruebas de integración (H2 en memoria): roles y permisos, novedades, mantenimientos, solicitudes, seguimiento
+cd frontend && npm test     # pruebas de utilidades, validaciones, unidades de medida y permisos del menú
 ```
 
-La aplicación en ejecución se verificó además con un recorrido de extremo a extremo contra MySQL real (login por rol, RBAC por HTTP, solicitud → rechazo/entrega → devolución con daños, CRUD de equipos y usuarios).
+Las cuentas e inventario que usan las pruebas se crean solo en la base de prueba en memoria
+(`backend/src/test/.../DatosDePrueba.java`); no forman parte de la aplicación.
 
 ## Estructura
 
 ```
 backend/   API REST (Spring Boot) · domain, repo, service, security, web
-frontend/  SPA React · api, pages por rol, components, context · public/images/equipos
-docker-compose.yml  MySQL 8 · iniciar.ps1  arranque completo · iniciar-mysql.ps1  MySQL portátil
-```
+frontend/  SPA React · api, pages por módulo, components, context · public/images/equipos
+docs/      ROLES_Y_PERMISOS.md (roles, permisos, flujos y mejoras a los requisitos)
+docker-compose.yml  MySQL 8 · iniciar-mysql.ps1  MySQL portátil · crear-base-datos.ps1  crea la base desde backend/db

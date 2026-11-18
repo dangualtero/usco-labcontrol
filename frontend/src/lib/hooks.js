@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { api } from '../api/index.js'
 
@@ -48,14 +48,33 @@ export function useAhora(ms = 30000) {
   return ahora
 }
 
-/** Laboratorios activos de la sede abierta (cada sede tiene los suyos). Mientras carga devuelve []. */
-export function useLaboratorios(deps = []) {
+/** Laboratorios visibles para la cuenta en la sede abierta: [{ id, nombre }]. Mientras carga devuelve []. */
+export function useLabsRef(deps = []) {
   const [labs, setLabs] = useState([])
   useEffect(() => {
     let vivo = true
-    api.laboratoriosSede().then((l) => { if (vivo) setLabs(l) }).catch(() => {})
+    api.laboratoriosRef().then((l) => { if (vivo) setLabs(l) }).catch(() => {})
     return () => { vivo = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
   return labs
 }
+
+/** Nombres de los laboratorios visibles (formularios de inventario). */
+export function useLaboratorios(deps = []) {
+  const labs = useLabsRef(deps)
+  return useMemo(() => labs.map((l) => l.nombre), [labs])
+}
+
+let catalogosCache = null
+/** Valores activos de los catálogos configurables: { CATEGORIA_EQUIPO: [...], ESTADO_FISICO: [...], ... }. */
+export function useCatalogos() {
+  const [c, setC] = useState(catalogosCache ?? {})
+  useEffect(() => {
+    let vivo = true
+    api.catalogos().then((x) => { catalogosCache = x; if (vivo) setC(x) }).catch(() => {})
+    return () => { vivo = false }
+  }, [])
+  return c
+}
+export const olvidarCatalogos = () => { catalogosCache = null }

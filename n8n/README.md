@@ -1,9 +1,9 @@
 # Agente de IA para los avisos de novedades (n8n)
 
-Cuando un auxiliar reporta que un equipo se **agotó, se dañó, se perdió o falla**, ocurre esto:
+Cuando el coordinador **valida** una novedad (un equipo se **agotó, se dañó, se perdió o falla**), ocurre esto:
 
 ```
-Auxiliar → «Reportar novedad» → API LabControl (guarda el reporte)
+Monitor → «Novedad» → Coordinador valida → API LabControl (aplica la novedad)
               │ en segundo plano
               ▼
         Webhook ──► Agente de IA ──► Interpretar ──► ¿Prioridad ALTA? ──sí──► Enviar correo ──► Responder a LabControl
@@ -84,7 +84,7 @@ El destinatario **no** se configura en n8n: lo envía el backend (`LABCONTROL_AL
    N8N_WEBHOOK_URL=http://localhost:5678/webhook/labcontrol-novedades
    N8N_WEBHOOK_TOKEN=el-mismo-token-de-la-credencial
    ```
-4. Reinicia el backend y reporta una novedad como auxiliar. En n8n, en **Executions**, verás cada ejecución paso a paso.
+4. Reinicia el backend, registra una novedad como monitor y valídala como coordinador (o regístrala directamente como coordinador). En n8n, en **Executions**, verás cada ejecución paso a paso.
 
 ## Qué decide la IA
 
@@ -94,4 +94,4 @@ El mensaje de sistema del nodo **Agente de IA** define los criterios, y puedes a
 - **MEDIA:** falla parcial o equipo agotado que requiere reposición.
 - **BAJA:** detalle estético o reporte informativo.
 
-La descripción del auxiliar se trata como dato, no como instrucciones, y el correo se arma escapando todo el texto para evitar inyección de HTML.
+La descripción de la novedad se trata como dato, no como instrucciones, y el correo se arma escapando todo el texto para evitar inyección de HTML.

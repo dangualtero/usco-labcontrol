@@ -21,13 +21,13 @@ export default function ElegirSede() {
         <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full border-[32px] border-oro-claro/10" />
         <div className="relative mx-auto flex max-w-5xl flex-col gap-6 px-5 pb-12 pt-6 sm:px-8">
           <div className="flex items-center justify-between gap-4">
-            <img src="/logo-usco.png" alt="Universidad Surcolombiana" className="h-12 w-auto" />
+            <img src="/logo-usco.webp" width="481" height="128" alt="Universidad Surcolombiana" className="h-12 w-auto" />
             <BotonTema />
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-oro-claro">Facultad de Ingeniería · Préstamo de equipos de laboratorio</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-oro-claro">Facultad de Ingeniería · Gestión de laboratorios</p>
             <h1 className="mt-2 font-titulo text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl">USCO <span className="text-oro-claro">LabControl</span></h1>
-            <p className="mt-3 max-w-2xl text-base text-white/90 sm:text-lg">Elige tu sede para ingresar. Cada sede tiene su propio inventario, sus auxiliares y sus usuarios.</p>
+            <p className="mt-3 max-w-2xl text-base text-white/90 sm:text-lg">Elige tu sede para ingresar. Cada sede tiene sus laboratorios, su inventario y sus responsables.</p>
           </div>
         </div>
         <div className="h-1 bg-oro-claro" />
@@ -47,6 +47,7 @@ export default function ElegirSede() {
                     <span className="mt-1 flex items-center gap-1.5 text-sm text-pizarra"><MapPin className="h-4 w-4 shrink-0" aria-hidden="true" /> {s.ciudad}{s.direccion ? ` · ${s.direccion}` : ''}</span>
                   </span>
                   <span className="flex items-center justify-between border-t border-slate-100 pt-3">
+                    <span className="font-mono text-xs font-semibold text-pizarra">/{s.slug}</span>
                     <span className="inline-flex items-center gap-1 text-sm font-bold text-usco">Ingresar <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></span>
                   </span>
                 </Link>

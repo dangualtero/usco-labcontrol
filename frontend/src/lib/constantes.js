@@ -1,9 +1,4 @@
-/** Laboratorios iniciales de la sede principal. Los de cada sede vienen de la API (useLaboratorios). */
-export const LABORATORIOS = ['Electrónica', 'Petróleos', 'Civil', 'Agrícola']
-export const LIMITE_EQUIPOS = 3
 export const REGEX_CORREO = /^[A-Za-z0-9._%+-]+@usco\.edu\.co$/
-/** Placa de un equipo prestable. */
-export const REGEX_PLACA = /^USCO-EQ-\d{3}$/
 /** Placa de inventario: equipo (USCO-EQ-000) o insumo (USCO-IN-000). */
 export const REGEX_PLACA_INVENTARIO = /^USCO-(EQ|IN)-\d{3}$/
 
@@ -32,14 +27,18 @@ export const fmtCantidad = (c, u) => (c === null || c === undefined ? '—' : `$
 /** Porcentaje con el que un insumo entra en alerta. */
 export const UMBRAL_ALERTA = 25
 
-export const GRUPOS = {
-  USUARIO: { etiqueta: 'Estudiante / Docente', home: '/usuario/catalogo' },
-  AUXILIAR: { etiqueta: 'Auxiliar de laboratorio', home: '/auxiliar' },
-  COORDINADOR: { etiqueta: 'Coordinador de laboratorios', home: '/coordinador' },
+/** Los tres roles de la hoja de requisitos. */
+export const ROLES = {
+  ADMINISTRADOR: { etiqueta: 'Administrador general', corta: 'Administrador' },
+  COORDINADOR_LAB: { etiqueta: 'Coordinador de Laboratorio', corta: 'Coordinador' },
+  MONITOR: { etiqueta: 'Monitor de Laboratorio', corta: 'Monitor' },
 }
 
-/** Ruta de inicio del rol dentro de una sede: homeDe('AUXILIAR', 'pitalito') → '/pitalito/auxiliar'. */
-export const homeDe = (grupo, sede) => (sede ? `/${sede}` : '') + (GRUPOS[grupo]?.home ?? '/login')
+/** ¿La cuenta tiene alguno de estos permisos? (el servidor aplica la misma regla en cada acción). */
+export const puede = (usuario, ...permisos) => permisos.some((p) => usuario?.permisos?.includes(p))
+
+/** Inicio dentro de una sede: homeDe('pitalito') → '/pitalito/tablero'. */
+export const homeDe = (sede, ruta = '/tablero') => (sede ? `/${sede}` : '') + ruta
 
 /** Categorías del presupuesto (las mismas que valida el servidor). */
 export const CATEGORIAS_PRESUPUESTO = ['Asignación', 'Compra de equipos', 'Mantenimiento', 'Calibración', 'Insumos y repuestos', 'Otro']
@@ -50,15 +49,13 @@ export const pesos = (v) => COP.format(v ?? 0)
 /** «La Plata» → «la-plata» (igual que el servidor). */
 export const slugDe = (t) => norm(t).replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
-/** Franjas de reserva (PF-06): 2 horas cada una. */
-export const FRANJAS = [
-  { inicio: '07:00', fin: '09:00' },
-  { inicio: '09:00', fin: '11:00' },
-  { inicio: '11:00', fin: '13:00' },
-  { inicio: '14:00', fin: '16:00' },
-  { inicio: '16:00', fin: '18:00' },
-  { inicio: '18:00', fin: '20:00' },
-]
-
 export const norm = (s) =>
   (s ?? '').toString().normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim()
+
+/** Prioridades (propuesta del laboratorio y asignada por el Administrador). */
+export const PRIORIDADES = ['ALTA', 'MEDIA', 'BAJA']
+export const PRIORIDAD_CLASE = {
+  ALTA: 'border-red-600 bg-red-50 text-red-900',
+  MEDIA: 'border-amber-600 bg-amber-50 text-amber-900',
+  BAJA: 'border-emerald-600 bg-emerald-50 text-emerald-900',
+}
